@@ -22,10 +22,15 @@ from context_managers.memory_based import MemoryBasedContextManager
 from memory_stores.base import BaseMemoryStore
 from memory_stores.knowledge_graph import KnowledgeGraphStore
 from memory_stores.vector_db import VectorDBStore
-from datasets.loader import load_dataset
+from benchmark.dataset_loader import load_dataset
 from eval.metrics import calculate_metrics
 
 from config.manager import ContextManagerType
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from memory_stores.muninndb import MuninnDBStore
+from memory_stores.trustgraph import TrustGraphStore
 
 
 @dataclass
@@ -68,12 +73,31 @@ class BenchmarkHarness:
             return KnowledgeGraphStore()
         elif self.config.context_manager_type == ContextManagerType.VECTOR_DB:
             return VectorDBStore()
+        elif self.config.context_manager_type == ContextManagerType.MUNINNDB:
+            return MuninnDBStore(
+                api_url=self.config.params.get("api_url", "http://localhost:8000"),
+                vault=self.config.params.get("vault", "default"),
+            )
+        elif self.config.context_manager_type == ContextManagerType.TRUSTGRAPH:
+            return TrustGraphStore(
+                api_url=self.config.params.get("api_url", "http://localhost:3000"),
+                vault=self.config.params.get("vault", "default"),
+                enable_benchmarking=self.config.params.get("enable_benchmarking", True),
+            )
         return None
 
     def _create_context_manager(self) -> BaseContextManager:
         """Create context manager based on config."""
         if self.config.context_manager_type == ContextManagerType.BASELINE:
             return BaselineContextManager()
+        elif self.config.context_manager_type == ContextManagerType.OPENAI_PARSER:
+            from context_managers.openai_parser import OpenAICompatibleContextManager
+
+            return OpenAICompatibleContextManager(
+                api_url=self.config.params.get("api_url", "http://localhost:8000"),
+                model=self.config.params.get("model", "gpt-3.5-turbo"),
+                k_retrieval=self.config.k_retrieval,
+            )
         else:
             return MemoryBasedContextManager(
                 memory_store=self.memory_store,
@@ -90,8 +114,9 @@ class BenchmarkHarness:
         start_time = time.time()
 
         # Process each message
+        max_messages = self.config.max_messages or 10
         for i, message in enumerate(messages):
-            if self.config.max_messages and i >= self.config.max_messages:
+            if i >= max_messages:
                 break
 
             # Parse and store in memory

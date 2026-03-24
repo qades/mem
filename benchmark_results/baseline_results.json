@@ -1,0 +1,17 @@
+[
+  {
+    "context_manager_type": "baseline",
+    "dataset_name": "chatbot_conversations",
+    "total_messages": 10,
+    "context_size": 146,
+    "response_time_ms": 0.031232833862304688,
+    "memory_usage_mb": 0.0,
+    "metrics": {
+      "bleu": 0.0,
+      "rouge_l": 0.0,
+      "exact_match": 0.0,
+      "semantic_similarity": 0.0
+    },
+    "metadata": {}
+  }
+]

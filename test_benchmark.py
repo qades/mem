@@ -13,7 +13,7 @@ from context_managers.baseline import BaselineContextManager
 from context_managers.memory_based import MemoryBasedContextManager
 from memory_stores.knowledge_graph import KnowledgeGraphStore
 from memory_stores.vector_db import VectorDBStore
-from datasets.loader import load_dataset
+from datasets import load_dataset
 
 
 class TestContextManagers(unittest.TestCase):

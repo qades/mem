@@ -1,4 +1,4 @@
-# Requirements for context management benchmark harness
+# Requirements for context management benchmark harness with new memory stores
 
 # Core dependencies
 typing-extensions>=4.0.0
@@ -7,6 +7,10 @@ typing-extensions>=4.0.0
 requests>=2.31.0
 datasets>=2.14.0
 huggingface-hub>=0.20.0
+
+# Memory stores (OpenAI-compatible API)
+# For MuninnDB, TrustGraph-AI, and OpenAI-compatible parsing
+# These work with any OpenAI-compatible API server
 
 # Optional: for advanced features
 # scikit-learn  # For advanced metrics

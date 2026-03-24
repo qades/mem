@@ -1,0 +1,17 @@
+[
+  {
+    "context_manager_type": "openai_parser",
+    "dataset_name": "test_dataset",
+    "total_messages": 10,
+    "context_size": 500,
+    "response_time_ms": 5.771875381469727,
+    "memory_usage_mb": 0.0,
+    "metrics": {
+      "bleu": 0.0,
+      "rouge_l": 0.0,
+      "exact_match": 0.0,
+      "semantic_similarity": 0.0
+    },
+    "metadata": {}
+  }
+]

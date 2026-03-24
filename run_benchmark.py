@@ -22,7 +22,7 @@ def run_benchmark(config_path: str = None):
     else:
         config = BenchmarkConfig(
             context_manager_type=ContextManagerType.BASELINE,
-            dataset_name="chatbot_conversations",
+            dataset_name="babilong",
         )
 
     harness = BenchmarkHarness(config)
@@ -50,7 +50,7 @@ def compare_strategies():
     for strategy in strategies:
         config = BenchmarkConfig(
             context_manager_type=strategy,
-            dataset_name="chatbot_conversations",
+            dataset_name="babilong",
             use_embeddings=strategy != ContextManagerType.KNOWLEDGE_GRAPH,
         )
 

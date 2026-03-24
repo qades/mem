@@ -1,0 +1,15 @@
+{
+  "context_manager_type": "openai_parser",
+  "dataset_name": "test_dataset",
+  "use_embeddings": true,
+  "k_retrieval": 5,
+  "api_url": "http://localhost:8000",
+  "api_key": null,
+  "model": "gpt-3.5-turbo",
+  "temperature": 0.1,
+  "max_tokens": 1000,
+  "params": {
+    "max_memory_items": 10000,
+    "retrieval_top_k": 5
+  }
+}

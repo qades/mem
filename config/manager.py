@@ -13,6 +13,9 @@ class ContextManagerType(Enum):
     BASELINE = "baseline"
     KNOWLEDGE_GRAPH = "knowledge_graph"
     VECTOR_DB = "vector_db"
+    MUNINNDB = "muninndb"
+    TRUSTGRAPH = "trustgraph"
+    OPENAI_PARSER = "openai_parser"
 
 
 @dataclass
@@ -26,6 +29,7 @@ class BenchmarkConfig:
     k_retrieval: int = 5
     enable_metrics: bool = True
     output_dir: str = "benchmark_results"
+    params: Dict[str, Any] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -89,6 +93,7 @@ class ConfigManager:
             k_retrieval=data.get("k_retrieval", 5),
             enable_metrics=data.get("enable_metrics", True),
             output_dir=data.get("output_dir", "benchmark_results"),
+            params=data.get("params", {}),
         )
 
     def save_config(self, config: BenchmarkConfig, config_path: str) -> None:

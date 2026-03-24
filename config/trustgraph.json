@@ -1,0 +1,17 @@
+{
+  "context_manager_type": "trustgraph",
+  "dataset_name": "test_dataset",
+  "use_embeddings": true,
+  "k_retrieval": 5,
+  "api_url": "http://localhost:3000",
+  "api_key": null,
+  "vault": "default",
+  "embedding_model": "text-embedding-3-small",
+  "context_parser_model": "gpt-3.5-turbo",
+  "enable_benchmarking": true,
+  "params": {
+    "max_memory_items": 10000,
+    "retrieval_top_k": 5,
+    "retrieval_threshold": 0.75
+  }
+}
