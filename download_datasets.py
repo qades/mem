@@ -97,7 +97,7 @@ def download_babilong(output_dir: Path, subset: str = None) -> Path:
 def download_mutual(output_dir: Path) -> Path:
     """Download MuTual dataset - multi-turn dialogue reasoning."""
     dataset_name = "lighteval/mutual_harness"
-    return download_hf_dataset(dataset_name, output_dir)
+    return download_hf_dataset(dataset_name, output_dir, "mutual")
 
 
 def download_agentbench(output_dir: Path) -> Path:
