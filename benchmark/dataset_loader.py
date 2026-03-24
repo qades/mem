@@ -1,167 +1,167 @@
-"""Dataset loader for benchmark harness."""
+"""
+Benchmark dataset loader with support for configurable excerpt sizes.
+"""
 
-from typing import List, Dict, Any, Optional
 import json
+import os
+from typing import List, Tuple, Optional
 from pathlib import Path
 
 
-def load_dataset(dataset_name: str, data_dir: str = "data/datasets") -> tuple:
-    """
-    Load a dataset for benchmarking.
+def load_dataset(
+    dataset_name: str, max_messages: int = None
+) -> Tuple[List[dict], Optional[List[str]]]:
+    """Load a dataset by name with optional message limit.
 
     Args:
-        dataset_name: Name of the dataset to load
-        data_dir: Directory containing dataset files
+        dataset_name: Name of the dataset (e.g., 'chatbot_conversations', 'test')
+        max_messages: Maximum number of messages to load (None = all)
 
     Returns:
-        Tuple of (messages, references) where:
-            - messages: List of message dicts with 'role' and 'content' keys
-            - references: List of reference answers (optional)
+        Tuple of (user_messages, assistant_references)
     """
-    # Try to load from unified dataset files
-    data_path = Path(data_dir) / f"{dataset_name}_unified.jsonl"
+    # Check for test dataset first
+    test_path = Path("data/test_dataset.jsonl")
+    if dataset_name == "chatbot_conversations" and test_path.exists():
+        return load_test_dataset(str(test_path), max_messages=max_messages)
 
+    # Check for conversation dataset
+    conv_path = Path("data/conversations.jsonl")
+    if dataset_name == "conversations" and conv_path.exists():
+        return load_conversation_dataset(str(conv_path), max_messages=max_messages)
+
+    # Try loading from data directory
+    data_path = Path("data") / f"{dataset_name}.jsonl"
     if data_path.exists():
-        return _load_unified_dataset(data_path)
+        return load_jsonl_dataset(str(data_path), max_messages=max_messages)
 
-    # Try direct HuggingFace dataset
-    try:
-        from datasets import load_dataset as hf_load_dataset
-        from datasets.exceptions import DatasetNotFoundError
+    # Try loading from benchmark_results directory
+    result_path = Path("benchmark_results") / f"{dataset_name}.jsonl"
+    if result_path.exists():
+        return load_jsonl_dataset(str(result_path), max_messages=max_messages)
 
-        dataset = hf_load_dataset(dataset_name)
-
-        if isinstance(dataset, dict):
-            # DatasetDict - combine all splits
-            all_data = []
-            for split in dataset.values():
-                all_data.extend(list(split))
-        else:
-            all_data = list(dataset)
-
-        return _convert_hf_dataset_to_messages(all_data)
-    except (ImportError, Exception) as e:
-        # Fallback: use mock data for testing
-        if dataset_name == "chatbot_conversations" or dataset_name == "test_dataset":
-            return _get_mock_dataset()
-        raise ValueError(
-            f"Could not load dataset '{dataset_name}': {e}. "
-            f"Ensure the dataset exists on HuggingFace Hub or is downloaded locally."
-        )
+    raise FileNotFoundError(
+        f"Dataset '{dataset_name}' not found. "
+        f"Looked in data/, benchmark_results/, and data/test_dataset.jsonl"
+    )
 
 
-def _load_unified_dataset(path: Path) -> tuple:
-    """Load from unified JSONL format."""
+def load_test_dataset(
+    path: str, max_messages: int = None
+) -> Tuple[List[dict], Optional[List[str]]]:
+    """Load test dataset with optional message limit."""
     messages = []
     references = []
 
     with open(path, "r") as f:
         for line in f:
-            item = json.loads(line.strip())
-            turns = item.get("turns", [])
+            msg = json.loads(line.strip())
+            messages.append(msg)
 
-            # Extract messages and references from turns
-            for turn in turns:
-                if turn.get("role") == "user":
-                    messages.append(turn)
-                elif turn.get("role") == "assistant":
-                    references.append(turn.get("content", ""))
+            # Collect assistant messages as references
+            if msg.get("role") == "assistant":
+                references.append(msg.get("content", ""))
 
-    # If no references found, return empty list
-    if not references:
-        references = [None] * len(messages)
+    # Apply limit if specified
+    if max_messages:
+        messages = messages[:max_messages]
 
-    return messages, references
+    # Separate user messages for processing
+    user_messages = [m for m in messages if m.get("role") == "user"]
+
+    return user_messages, references if references else None
 
 
-def _convert_hf_dataset_to_messages(data: List[Dict[str, Any]]) -> tuple:
-    """Convert HuggingFace dataset to messages format."""
+def load_conversation_dataset(
+    path: str, max_messages: int = None
+) -> Tuple[List[dict], Optional[List[str]]]:
+    """Load conversation dataset with optional message limit."""
     messages = []
     references = []
 
-    for item in data:
-        # Try to extract turns
-        if "turns" in item:
-            for turn in item["turns"]:
-                if turn.get("role") == "user":
-                    messages.append(turn)
-                elif turn.get("role") == "assistant":
-                    references.append(turn.get("content", ""))
-        # Try to extract dialogue
-        elif "dialogue" in item:
-            for turn in item["dialogue"]:
-                role = turn.get("speaker", "user").lower()
-                content = turn.get("utterance", "")
-                if role == "user":
-                    messages.append({"role": "user", "content": content})
-                else:
-                    references.append(content)
-        # Try to extract conversation
-        elif "conversation" in item:
-            conv = item["conversation"]
-            for turn in conv:
-                if turn.get("human"):
-                    messages.append({"role": "user", "content": turn["human"]})
-                if turn.get("answer"):
-                    references.append(turn["answer"])
-        # Generic fallback - look for common keys
-        else:
-            # Try to find any text content
-            for key in ["text", "content", "input", "query"]:
-                if key in item:
-                    messages.append({"role": "user", "content": str(item[key])})
-                    break
+    with open(path, "r") as f:
+        for line in f:
+            msg = json.loads(line.strip())
+            messages.append(msg)
 
-    # If no references found, return empty list
-    if not references and messages:
-        references = [None] * len(messages)
+            if msg.get("role") == "assistant":
+                references.append(msg.get("content", ""))
 
-    return messages, references
+    if max_messages:
+        messages = messages[:max_messages]
+
+    user_messages = [m for m in messages if m.get("role") == "user"]
+
+    return user_messages, references if references else None
 
 
-def _get_mock_dataset() -> tuple:
-    """Return mock dataset for testing when no real dataset is available."""
-    messages = [
-        {"role": "user", "content": "Hello, how are you?"},
-        {
-            "role": "assistant",
-            "content": "I'm doing well, thank you for asking! How can I help you today?",
-        },
-        {
-            "role": "user",
-            "content": "Can you explain how memory management works in Python?",
-        },
-        {
-            "role": "assistant",
-            "content": "Python memory management involves several key components...",
-        },
-        {"role": "user", "content": "What about garbage collection?"},
-        {
-            "role": "assistant",
-            "content": "Python uses reference counting and cyclic garbage collection...",
-        },
-        {"role": "user", "content": "Can you tell me about the GIL?"},
-        {
-            "role": "assistant",
-            "content": "The Global Interpreter Lock (GIL) is a mutex that protects access to Python objects...",
-        },
-        {"role": "user", "content": "Thanks for the explanation!"},
-        {
-            "role": "assistant",
-            "content": "You're welcome! Feel free to ask if you have more questions.",
-        },
-    ]
-    references = [msg["content"] for msg in messages if msg["role"] == "assistant"]
-    return messages, references
+def load_jsonl_dataset(
+    path: str, max_messages: int = None
+) -> Tuple[List[dict], Optional[List[str]]]:
+    """Load generic JSONL dataset."""
+    messages = []
+    references = []
+
+    with open(path, "r") as f:
+        for line in f:
+            msg = json.loads(line.strip())
+            messages.append(msg)
+
+            if msg.get("role") == "assistant":
+                references.append(msg.get("content", ""))
+
+    if max_messages:
+        messages = messages[:max_messages]
+
+    user_messages = [m for m in messages if m.get("role") == "user"]
+
+    return user_messages, references if references else None
 
 
-def list_available_datasets(data_dir: str = "data/datasets") -> List[str]:
-    """List available datasets in the data directory."""
+def load_from_directory(
+    directory: str, max_messages: int = None
+) -> Tuple[List[dict], Optional[List[str]]]:
+    """Load all .jsonl files from a directory."""
+    all_messages = []
+    all_references = []
+
+    dir_path = Path(directory)
+    if not dir_path.exists():
+        raise FileNotFoundError(f"Directory '{directory}' not found")
+
+    for jsonl_file in dir_path.glob("*.jsonl"):
+        messages, references = load_jsonl_dataset(str(jsonl_file), max_messages=None)
+        all_messages.extend(messages)
+        all_references.extend(references)
+
+    if max_messages:
+        all_messages = all_messages[:max_messages]
+
+    user_messages = [m for m in all_messages if m.get("role") == "user"]
+
+    return user_messages, all_references if all_references else None
+
+
+def get_available_datasets() -> List[str]:
+    """Get list of available dataset names."""
     datasets = []
-    data_path = Path(data_dir)
 
-    if data_path.exists():
-        for file in data_path.glob("*_unified.jsonl"):
-            datasets.append(file.stem.replace("_unified", ""))
+    # Check standard locations
+    if Path("data/test_dataset.jsonl").exists():
+        datasets.append("chatbot_conversations")
+    if Path("data/conversations.jsonl").exists():
+        datasets.append("conversations")
 
-    return datasets
+    # Check data directory
+    data_dir = Path("data")
+    if data_dir.exists():
+        for file in data_dir.glob("*.jsonl"):
+            datasets.append(file.stem)
+
+    # Check benchmark_results directory
+    result_dir = Path("benchmark_results")
+    if result_dir.exists():
+        for file in result_dir.glob("*.jsonl"):
+            datasets.append(file.stem)
+
+    return list(set(datasets))  # Remove duplicates

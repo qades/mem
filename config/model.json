@@ -1,0 +1,10 @@
+{
+  "provider": "openai",
+  "chat_model": "Qwen3-Coder-Next-Q4_K_M",
+  "parser_model": "LFM2.5-1.2B-Instruct-Q8_0",
+  "embedding_model": "LFM2.5-1.2B-Instruct-Q8_0",
+  "api_url": "http://localhost:58080/v1",
+  "api_key": null,
+  "temperature": 0.7,
+  "max_tokens": 1000
+}

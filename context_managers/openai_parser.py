@@ -1,11 +1,13 @@
 """
 OpenAI-compatible API context parser for fast utility LLM that parses context from messages.
+NOTE: This is NOT a memory store - it only parses and extracts structured information.
 """
 
 import json
 import time
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from collections import defaultdict
 
 from .base import BaseContextManager
 
@@ -16,13 +18,17 @@ except ImportError:
 
 
 class OpenAIContextParser:
-    """Parse messages using OpenAI-compatible API for fast context extraction."""
+    """Parse messages using OpenAI-compatible API for fast context extraction.
+
+    This class does NOT store memory - it only extracts structured information
+    from messages for use by other components.
+    """
 
     def __init__(
         self,
-        api_url: str = "http://localhost:8000",
+        api_url: str = "http://localhost:58080/v1",
         api_key: str = None,
-        model: str = "gpt-3.5-turbo",
+        model: str = "LFM2.5-1.2B-Instruct-Q8_0",
         temperature: float = 0.1,
         max_tokens: int = 1000,
     ):
@@ -34,8 +40,6 @@ class OpenAIContextParser:
 
     def parse_message(self, content: str, role: str = "user") -> Dict[str, Any]:
         """Parse a message and extract structured information."""
-        import requests
-
         try:
             response = requests.post(
                 f"{self.api_url}/chat/completions",
@@ -146,13 +150,20 @@ Be concise and accurate. Only return valid JSON."""
 
 
 class OpenAICompatibleContextManager(BaseContextManager):
-    """Context manager using OpenAI-compatible API for fast context parsing."""
+    """Context manager using OpenAI-compatible API for fast context parsing.
+
+    NOTE: This is NOT a memory store - it only parses messages and extracts
+    structured information. The parsed data is kept in memory only during
+    the current session and is NOT persisted.
+
+    Use with a memory store (VectorDB, KnowledgeGraph, etc.) for persistent storage.
+    """
 
     def __init__(
         self,
-        api_url: str = "http://localhost:8000",
+        api_url: str = "http://localhost:58080/v1",
         api_key: str = None,
-        model: str = "gpt-3.5-turbo",
+        model: str = "LFM2.5-1.2B-Instruct-Q8_0",
         k_retrieval: int = 5,
         enable_benchmarking: bool = True,
     ):
@@ -169,7 +180,7 @@ class OpenAICompatibleContextManager(BaseContextManager):
         self.benchmark_times: List[float] = []
 
     def process_message(self, message: Dict[str, str]) -> None:
-        """Process message: parse and store."""
+        """Process message: parse and store in temporary memory."""
         start_time = time.time() if self.enable_benchmarking else None
 
         content = message.get("content", "")
@@ -193,15 +204,15 @@ class OpenAICompatibleContextManager(BaseContextManager):
             self.benchmark_times.append(elapsed)
 
     def get_context(self, current_message: Dict[str, str]) -> str:
-        """Get context for current message."""
+        """Get context for current message from parsed history."""
         # Get relevant messages
         relevant = self._get_relevant_messages(current_message)
 
-        # Build context
+        # Build context from parsed data
         context_parts = []
 
         for msg in relevant:
-            parsed = next((p for p in self.parsed_messages if p.get("entities")), None)
+            parsed = msg.get("parsed", {})
             if parsed:
                 entities = parsed.get("entities", [])
                 facts = parsed.get("facts", [])
@@ -215,10 +226,10 @@ class OpenAICompatibleContextManager(BaseContextManager):
     def _get_relevant_messages(
         self, current_message: Dict[str, str]
     ) -> List[Dict[str, Any]]:
-        """Get relevant past messages."""
+        """Get relevant past messages based on parsed content."""
         current_content = current_message.get("content", "")
 
-        # Simple relevance: check for keyword overlap
+        # Simple relevance: check for keyword overlap with parsed entities
         current_words = set(current_content.lower().split())
 
         scored_messages = []
@@ -231,18 +242,26 @@ class OpenAICompatibleContextManager(BaseContextManager):
 
             score = overlap + fact_overlap * 0.5
             if score > 0:
-                scored_messages.append((i, score))
+                scored_messages.append((i, score, parsed))
 
         scored_messages.sort(key=lambda x: x[1], reverse=True)
 
-        return [self.message_log[i] for i, _ in scored_messages[: self.k_retrieval]]
+        # Return top-k with parsed data
+        return [
+            {
+                "id": i + 1,
+                "parsed": parsed,
+                "relevance_score": score,
+            }
+            for i, score, parsed in scored_messages[: self.k_retrieval]
+        ]
 
     def get_context_size(self) -> int:
         """Estimate context size in tokens."""
         return len(self.parsed_messages) * 50  # Rough estimate
 
     def reset(self) -> None:
-        """Reset state."""
+        """Reset state (clears temporary memory)."""
         self.message_counter = 0
         self.message_log.clear()
         self.parsed_messages.clear()
@@ -260,3 +279,15 @@ class OpenAICompatibleContextManager(BaseContextManager):
             "max_time_ms": max(self.benchmark_times),
             "total_time_ms": sum(self.benchmark_times),
         }
+
+    def get_parsed_history(self) -> List[Dict[str, Any]]:
+        """Get full parsed message history."""
+        return self.parsed_messages
+
+    def get_entity_index(self) -> Dict[str, List[int]]:
+        """Get index of which messages mention each entity."""
+        entity_index = defaultdict(list)
+        for i, parsed in enumerate(self.parsed_messages):
+            for entity in parsed.get("entities", []):
+                entity_index[entity].append(i)
+        return dict(entity_index)

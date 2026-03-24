@@ -1,14 +1,16 @@
 {
   "context_manager_type": "vector_db",
   "dataset_name": "chatbot_conversations",
+  "max_messages": 20,
   "use_embeddings": true,
   "k_retrieval": 5,
+  "enable_metrics": true,
+  "output_dir": "benchmark_results",
   "params": {
-    "max_memory_items": 10000,
-    "embedding_model": "all-MiniLM-L6-v2",
-    "retrieval_top_k": 5,
-    "retrieval_threshold": 0.75,
-    "chunk_size": 512,
-    "chunk_overlap": 50
+    "api_url": "http://localhost:58080/v1",
+    "parser_model": "LFM2.5-1.2B-Instruct-Q8_0",
+    "store_type": "in_memory",
+    "k_retrieval": 5,
+    "enable_benchmarking": true
   }
 }

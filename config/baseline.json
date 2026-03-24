@@ -1,9 +1,13 @@
 {
   "context_manager_type": "baseline",
   "dataset_name": "chatbot_conversations",
+  "max_messages": 20,
+  "use_embeddings": false,
+  "k_retrieval": 5,
+  "enable_metrics": true,
+  "output_dir": "benchmark_results",
   "params": {
-    "max_history_length": 10000,
-    "include_system_messages": true,
-    "token_budget": 4000
+    "k_retrieval": 5,
+    "enable_benchmarking": true
   }
 }

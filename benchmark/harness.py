@@ -19,18 +19,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from context_managers.base import BaseContextManager
 from context_managers.baseline import BaselineContextManager
 from context_managers.memory_based import MemoryBasedContextManager
+from context_managers.openai_parser import (
+    OpenAICompatibleContextManager,
+    OpenAIContextParser,
+)
 from memory_stores.base import BaseMemoryStore
 from memory_stores.knowledge_graph import KnowledgeGraphStore
 from memory_stores.vector_db import VectorDBStore
 from benchmark.dataset_loader import load_dataset
 from eval.metrics import calculate_metrics
 
-from config.manager import ContextManagerType
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from memory_stores.muninndb import MuninnDBStore
-from memory_stores.trustgraph import TrustGraphStore
+from config.manager import ContextManagerType, VectorStoreType
 
 
 @dataclass
@@ -57,6 +56,7 @@ class BenchmarkConfig:
     use_embeddings: bool = True
     k_retrieval: int = 5
     enable_metrics: bool = True
+    params: Dict[str, Any] = field(default_factory=dict)
 
 
 class BenchmarkHarness:
@@ -67,23 +67,37 @@ class BenchmarkHarness:
         self.memory_store = self._create_memory_store()
         self.context_manager = self._create_context_manager()
 
-    def _create_memory_store(self) -> BaseMemoryStore:
+    def _create_memory_store(self) -> Optional[BaseMemoryStore]:
         """Create memory store based on config."""
-        if self.config.context_manager_type == ContextManagerType.KNOWLEDGE_GRAPH:
+        store_type_str = self.config.params.get("store_type", "in_memory")
+        store_type = VectorStoreType(store_type_str)
+
+        if store_type == VectorStoreType.CHROMADB:
+            return VectorDBStore(
+                store_type="chromadb",
+                collection_name=self.config.params.get("collection_name", "memory"),
+                dimension=self.config.params.get("dimension", 768),
+                api_url=self.config.params.get("api_url", "http://localhost:8000"),
+                api_key=self.config.params.get("api_key"),
+            )
+        elif store_type == VectorStoreType.FAISS:
+            return VectorDBStore(
+                store_type="faiss",
+                collection_name=self.config.params.get("collection_name", "memory"),
+                dimension=self.config.params.get("dimension", 768),
+            )
+        elif self.config.context_manager_type == ContextManagerType.KNOWLEDGE_GRAPH:
             return KnowledgeGraphStore()
         elif self.config.context_manager_type == ContextManagerType.VECTOR_DB:
-            return VectorDBStore()
+            return VectorDBStore(
+                store_type="in_memory",
+                collection_name=self.config.params.get("collection_name", "memory"),
+                dimension=self.config.params.get("dimension", 768),
+            )
         elif self.config.context_manager_type == ContextManagerType.MUNINNDB:
-            return MuninnDBStore(
-                api_url=self.config.params.get("api_url", "http://localhost:8000"),
-                vault=self.config.params.get("vault", "default"),
-            )
+            return None  # MuninnDB handles its own storage
         elif self.config.context_manager_type == ContextManagerType.TRUSTGRAPH:
-            return TrustGraphStore(
-                api_url=self.config.params.get("api_url", "http://localhost:3000"),
-                vault=self.config.params.get("vault", "default"),
-                enable_benchmarking=self.config.params.get("enable_benchmarking", True),
-            )
+            return None  # TrustGraph handles its own storage
         return None
 
     def _create_context_manager(self) -> BaseContextManager:
@@ -91,12 +105,13 @@ class BenchmarkHarness:
         if self.config.context_manager_type == ContextManagerType.BASELINE:
             return BaselineContextManager()
         elif self.config.context_manager_type == ContextManagerType.OPENAI_PARSER:
-            from context_managers.openai_parser import OpenAICompatibleContextManager
-
             return OpenAICompatibleContextManager(
-                api_url=self.config.params.get("api_url", "http://localhost:8000"),
-                model=self.config.params.get("model", "gpt-3.5-turbo"),
+                api_url=self.config.params.get("api_url", "http://localhost:58080/v1"),
+                model=self.config.params.get(
+                    "parser_model", "LFM2.5-1.2B-Instruct-Q8_0"
+                ),
                 k_retrieval=self.config.k_retrieval,
+                enable_benchmarking=self.config.params.get("enable_benchmarking", True),
             )
         else:
             return MemoryBasedContextManager(
@@ -144,7 +159,17 @@ class BenchmarkHarness:
             response_time_ms=(end_time - start_time) * 1000,
             memory_usage_mb=self._get_memory_usage(),
             metrics=metrics,
+            metadata={
+                "k_retrieval": self.config.k_retrieval,
+                "use_embeddings": self.config.use_embeddings,
+            },
         )
+
+        # Add parser-specific metadata if applicable
+        if hasattr(self.context_manager, "get_benchmark_summary"):
+            result.metadata["parser_summary"] = (
+                self.context_manager.get_benchmark_summary()
+            )
 
         return result
 

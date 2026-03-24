@@ -1,171 +1,128 @@
-# Memory Management System - Quick Reference
-
-## Quick Start
-
-```bash
-# Install and run tests
-bash quickstart.sh
-
-# Run benchmarks
-python3 run_benchmark.py --config config/vector_db.json
-python3 run_benchmark.py --config config/muninndb.json
-python3 run_benchmark.py --config config/trustgraph.json
-python3 run_benchmark.py --config config/openai_parser.json
-
-# Compare all strategies
-python3 run_benchmark.py --compare
-
-# Start OpenAI-compatible test server
-python3 server.py --port 8000
-```
-
-## Memory Stores
-
-| Store | API | Embeddings | Benchmarking | Use Case |
-|-------|-----|------------|--------------|----------|
-| VectorDB | None | Hash | No | Fast, local storage |
-| KnowledgeGraph | None | Hash | No | Graph relationships |
-| MuninnDB | OpenAI | API | No | Persistent, API-based |
-| TrustGraph | OpenAI | API | Yes | Benchmarkable, API-based |
-
-## Context Managers
-
-| Manager | Strategy | Speed | Context Size |
-|---------|----------|-------|--------------|
-| Baseline | Full history | ⚡⚡⚡ | Large |
-| MemoryBased | Retrieval | ⚡⚡ | Optimized |
-| OpenAIParser | LLM parsing | ⚡⚡⚡ | Optimized |
+# Quick Reference Card
 
 ## Configuration
 
-```json
-{
-  "context_manager_type": "vector_db",
-  "dataset_name": "test_dataset",
-  "use_embeddings": true,
-  "k_retrieval": 5,
-  "api_url": "http://localhost:8000",
-  "vault": "default",
-  "params": {
-    "max_memory_items": 10000,
-    "retrieval_top_k": 5
-  }
-}
+```python
+from config.manager import ConfigManager, ContextManagerType, VectorStoreType
+
+config_mgr = ConfigManager()
+
+# Model config
+config_mgr.load_model_config()  # api_url: localhost:58080/v1
+config_mgr.save_model_config(model_config)
+
+# Vector store config
+config_mgr.load_vector_store_config()  # store_type: in_memory
+config_mgr.save_vector_store_config(vector_config)
+
+# Benchmark config
+config_mgr.load_config("config/openai_parser.json")
 ```
+
+## Run Benchmark
+
+```python
+from benchmark.harness import BenchmarkHarness, BenchmarkConfig
+
+config = BenchmarkConfig(
+    context_manager_type=ContextManagerType.OPENAI_PARSER,
+    dataset_name="chatbot_conversations",
+    max_messages=20,
+    params={
+        "api_url": "http://localhost:58080/v1",
+        "parser_model": "LFM2.5-1.2B-Instruct-Q8_0",
+    }
+)
+
+harness = BenchmarkHarness(config)
+result = harness.run_benchmark(messages)
+```
+
+## OpenAI Parser
+
+```python
+from context_managers.openai_parser import OpenAICompatibleContextManager
+
+parser = OpenAICompatibleContextManager(
+    api_url="http://localhost:58080/v1",
+    parser_model="LFM2.5-1.2B-Instruct-Q8_0",
+    k_retrieval=5
+)
+
+parser.process_message({"role": "user", "content": "Hello"})
+context = parser.get_context({"role": "user", "content": "What?"})
+parser.reset()
+```
+
+## Vector DB
+
+```python
+from memory_stores.vector_db import VectorDBStore
+
+# In-memory (default)
+store = VectorDBStore()
+
+# ChromaDB
+store = VectorDBStore(store_type="chromadb")
+
+# FAISS
+store = VectorDBStore(store_type="faiss")
+
+store.insert("user", "likes", "python")
+results = store.retrieve("python", k=5)
+```
+
+## Scripts
+
+```bash
+# Quick setup
+./quickstart.sh
+
+# Run benchmark (20 messages default)
+./run_benchmark.sh
+
+# Custom excerpt size
+./run_benchmark.sh 50
+
+# Run tests
+python test_new_system.py
+```
+
+## File Locations
+
+- Config: `config/*.json`
+- Data: `data/*.jsonl`
+- Results: `benchmark_results/*.json`
+- Tests: `test_new_system.py`
+
+## Common Tasks
+
+| Task | Command/Code |
+|------|-------------|
+| Load config | `config_mgr.load_config("config/openai_parser.json")` |
+| Create parser | `OpenAICompatibleContextManager(api_url=...)` |
+| Insert vector | `store.insert("e", "r", "v")` |
+| Search | `store.retrieve("query", k=5)` |
+| Run benchmark | `harness.run_benchmark(messages)` |
+| Save results | `harness.save_results(results, path)` |
 
 ## API Endpoints
 
-- `GET /health` - Health check
-- `POST /chat/completions` - Chat completions
-- `POST /embeddings` - Embeddings
-- `POST /memories` - Create memory
-- `POST /memories/update` - Update memory
-- `POST /memories/delete` - Delete memory
-- `POST /memories/clear` - Clear memories
-- `POST /search` - Search
-- `GET /stats` - Statistics
+- Chat: `http://localhost:58080/v1/chat/completions`
+- Embeddings: `http://localhost:58080/v1/embeddings`
+- Models: `http://localhost:58080/v1/models`
 
-## Available Types
+## Strategy Types
 
-- `baseline` - Full history
-- `vector_db` - Vector DB memory store
-- `knowledge_graph` - Knowledge graph memory store
-- `muninndb` - MuninnDB with API
-- `trustgraph` - TrustGraph with benchmarking
-- `openai_parser` - OpenAI parser
+- `ContextManagerType.BASELINE`
+- `ContextManagerType.OPENAI_PARSER`
+- `ContextManagerType.VECTOR_DB`
+- `ContextManagerType.KNOWLEDGE_GRAPH`
+- `ContextManagerType.MUNINNDB`
+- `ContextManagerType.TRUSTGRAPH`
 
-## Test Results
+## Vector Store Types
 
-```
-✓ VectorDB Store - PASS
-✓ KnowledgeGraph Store - PASS
-✓ Context Manager - PASS
-✓ Full Pipeline - PASS
-✓ MuninnDB Store - PASS
-✓ TrustGraph Store - PASS
-✓ OpenAI Parser - PASS
-```
-
-## Performance
-
-| Strategy | Context | Time |
-|----------|---------|------|
-| Baseline | 146 tokens | 0.03ms |
-| VectorDB | 500 tokens | 9.16ms |
-| KnowledgeGraph | 500 tokens | 0.17ms |
-| MuninnDB | 500 tokens | 16.90ms |
-| TrustGraph | 500 tokens | 1479.90ms |
-| OpenAI Parser | 500 tokens | 5.77ms |
-
-## Key Commands
-
-```bash
-# Run tests
-python3 test_memory_system.py
-
-# Run comprehensive tests
-python3 test_new_system.py
-
-# List datasets
-python3 run_benchmark.py --list-datasets
-
-# Compare all strategies
-python3 run_benchmark.py --compare
-```
-
-## File Structure
-
-```
-mem/
-├── memory_stores/
-│   ├── base.py
-│   ├── vector_db.py
-│   ├── knowledge_graph.py
-│   ├── muninndb.py (NEW)
-│   └── trustgraph.py (NEW)
-├── context_managers/
-│   ├── base.py
-│   ├── baseline.py
-│   ├── memory_based.py
-│   └── openai_parser.py (NEW)
-├── benchmark/
-│   └── harness.py (UPDATED)
-├── config/
-│   ├── baseline.json
-│   ├── vector_db.json
-│   ├── knowledge_graph.json
-│   ├── muninndb.json (NEW)
-│   ├── trustgraph.json (NEW)
-│   └── openai_parser.json (NEW)
-├── server.py (NEW)
-├── data/test_dataset.py (NEW)
-├── quickstart.sh (NEW)
-├── test_memory_system.py (NEW)
-├── test_new_system.py (NEW)
-├── README.md (UPDATED)
-├── DOCUMENTATION.md (NEW)
-└── IMPLEMENTATION_SUMMARY.md (NEW)
-```
-
-## Integration
-
-```python
-# Use with any OpenAI-compatible API
-from memory_stores.muninndb import MuninnDBStore
-
-store = MuninnDBStore(
-    api_url="http://localhost:8000",
-    vault="default"
-)
-
-# Or use real API
-store = MuninnDBStore(
-    api_url="https://api.openai.com/v1",
-    api_key="sk-...",
-    vault="default"
-)
-```
-
-## License
-
-MIT
+- `VectorStoreType.IN_MEMORY`
+- `VectorStoreType.CHROMADB`
+- `VectorStoreType.FAISS`

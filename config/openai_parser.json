@@ -1,15 +1,16 @@
 {
   "context_manager_type": "openai_parser",
-  "dataset_name": "test_dataset",
-  "use_embeddings": true,
+  "dataset_name": "chatbot_conversations",
+  "max_messages": 20,
+  "use_embeddings": false,
   "k_retrieval": 5,
-  "api_url": "http://localhost:8000",
-  "api_key": null,
-  "model": "gpt-3.5-turbo",
-  "temperature": 0.1,
-  "max_tokens": 1000,
+  "enable_metrics": true,
+  "output_dir": "benchmark_results",
   "params": {
-    "max_memory_items": 10000,
-    "retrieval_top_k": 5
+    "api_url": "http://localhost:58080/v1",
+    "chat_model": "Qwen3-Coder-Next-Q4_K_M",
+    "parser_model": "LFM2.5-1.2B-Instruct-Q8_0",
+    "k_retrieval": 5,
+    "enable_benchmarking": true
   }
 }

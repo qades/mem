@@ -1,307 +1,430 @@
-# Memory Management System Documentation
+# Documentation
 
-## Overview
-
-This system implements a flexible memory management architecture for LLM conversations, supporting multiple storage backends with OpenAI-compatible API integration.
+This document provides comprehensive documentation for the memory/context management system.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Context Manager                           │
-│  ┌─────────────────┐  ┌──────────────────┐  ┌─────────────┐ │
-│  │   Baseline      │  │  Memory-Based    │  │  OpenAI     │ │
-│  │  (Full History) │  │  (Retrieval)     │  │  Parser     │ │
-│  └─────────────────┘  └──────────────────┘  └─────────────┘ │
-└──────────────────────────┬────────────────────────────────────┘
-                           │
-          ┌────────────────┼────────────────┐
-          │                │                │
-    ┌─────▼─────┐    ┌─────▼─────┐    ┌─────▼─────┐
-    │ VectorDB  │    │ Knowledge │    │  OpenAI     │
-    │           │    │  Graph    │    │  Compatible │
-    └───────────┘    └───────────┘    │   API       │
-                                      └─────┬─────┘
-                                            │
-                                      ┌─────▼─────┐
-                                      │  MuninnDB   │
-                                      │ TrustGraph  │
-                                      └─────────────┘
-```
-
-## Memory Stores
-
-### 1. VectorDBStore
-
-Simple in-memory vector storage with cosine similarity search.
-
-**Features:**
-- Vector embeddings (768 dimensions, hash-based)
-- Inverted index for keyword search
-- BM25 scoring for relevance
-- Fast retrieval
-
-**Usage:**
-```python
-from memory_stores.vector_db import VectorDBStore
-
-store = VectorDBStore()
-store.insert("Python", "programming_language", "popular")
-results = store.retrieve("Python programming", k=5)
-```
-
-### 2. KnowledgeGraphStore
-
-Graph-based memory with node-edge structure.
-
-**Features:**
-- Nodes for entities and values
-- Edges for relations
-- Simple graph traversal
-- Entity indexing
-
-**Usage:**
-```python
-from memory_stores.knowledge_graph import KnowledgeGraphStore
-
-store = KnowledgeGraphStore()
-store.insert("user", "likes", "Python")
-results = store.retrieve("user preferences", k=5)
-```
-
-### 3. MuninnDBStore
-
-Persistent memory using OpenAI-compatible API.
-
-**Features:**
-- OpenAI-compatible API integration
-- Vector embeddings via API
-- Entity extraction via LLM
-- Persistent storage
-- Confidence scoring
-
-**Usage:**
-```python
-from memory_stores.muninndb import MuninnDBStore
-
-store = MuninnDBStore(
-    api_url="http://localhost:8000",
-    vault="default"
-)
-store.insert("Python", "language", "popular")
-results = store.retrieve("Python programming", k=5)
-```
-
-### 4. TrustGraphStore
-
-Benchmarkable memory with performance tracking.
-
-**Features:**
-- OpenAI-compatible API integration
-- Benchmarking support
-- Performance metrics
-- Entity extraction via LLM
-- Persistent storage
-
-**Usage:**
-```python
-from memory_stores.trustgraph import TrustGraphStore
-
-store = TrustGraphStore(
-    api_url="http://localhost:3000",
-    enable_benchmarking=True
-)
-store.insert("Python", "language", "popular")
-results = store.retrieve("Python programming", k=5)
-print(store.get_benchmark_summary())
-```
-
-## Context Managers
-
-### 1. BaselineContextManager
-
-Sends all previous messages with the current one.
-
-**Pros:**
-- Simple
-- No parsing overhead
-- Complete context
-
-**Cons:**
-- Large context size
-- No retrieval optimization
-
-### 2. MemoryBasedContextManager
-
-Parses messages, stores information, retrieves relevant context.
-
-**Features:**
-- Information extraction
-- Semantic search
-- Context optimization
-- Multiple memory stores
-
-**Usage:**
-```python
-from memory_stores.vector_db import VectorDBStore
-from context_managers.memory_based import MemoryBasedContextManager
-
-store = VectorDBStore()
-manager = MemoryBasedContextManager(
-    memory_store=store,
-    use_embeddings=True,
-    k_retrieval=5
-)
-
-manager.process_message({"role": "user", "content": "Hello"})
-context = manager.get_context({"role": "user", "content": "How are you?"})
-```
-
-### 3. OpenAICompatibleContextManager
-
-Uses OpenAI-compatible API for fast context parsing.
-
-**Features:**
-- Fast LLM parsing
-- Entity extraction
-- Relation extraction
-- Benchmarking support
-
-**Usage:**
-```python
-from context_managers.openai_parser import OpenAICompatibleContextManager
-
-manager = OpenAICompatibleContextManager(
-    api_url="http://localhost:8000",
-    model="gpt-3.5-turbo",
-    k_retrieval=5
-)
-
-manager.process_message({"role": "user", "content": "Hello"})
-context = manager.get_context({"role": "user", "content": "How are you?"})
-```
-
-## OpenAI-Compatible API Server
-
-The system includes a test server that provides an OpenAI-compatible API.
-
-### Endpoints
-
-- `GET /health` - Health check
-- `POST /chat/completions` - Chat completions
-- `POST /embeddings` - Embedding generation
-- `POST /memories` - Create memory
-- `POST /memories/update` - Update memory
-- `POST /memories/delete` - Delete memory
-- `POST /memories/clear` - Clear memories
-- `POST /search` - Semantic search
-- `GET /stats` - Get statistics
-
-### Running the Server
-
-```bash
-python3 server.py --port 8000
+│                    Benchmark Harness                         │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  Context Manager Strategy                              │  │
+│  │  - Baseline (full history)                            │  │
+│  │  - OpenAI Parser (LLM extraction)                     │  │
+│  │  - Vector DB (similarity)                             │  │
+│  │  - Knowledge Graph (relations)                        │  │
+│  │  - MuninnDB (API)                                     │  │
+│  │  - TrustGraph (API + benchmarking)                    │  │
+│  └────────────────────────────────────────────────────────┘  │
+│                         │                                     │
+│  ┌──────────────────────┴──────────────────────────────────┐ │
+│  │                    Memory Store                         │ │
+│  │  - ChromaDB / FAISS / in-memory (vector)               │ │
+│  │  - Knowledge graph (triple store)                      │ │
+│  │  - API (MuninnDB, TrustGraph)                          │ │
+│  └─────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## Configuration
 
-### Config File Format
+### Model Configuration
+
+**File: `config/model.json`**
 
 ```json
 {
-  "context_manager_type": "vector_db",
-  "dataset_name": "test_dataset",
+  "provider": "openai",
+  "chat_model": "Qwen3-Coder-Next-Q4_K_M",
+  "parser_model": "LFM2.5-1.2B-Instruct-Q8_0",
+  "embedding_model": "LFM2.5-1.2B-Instruct-Q8_0",
+  "api_url": "http://localhost:58080/v1",
+  "api_key": null,
+  "temperature": 0.7,
+  "max_tokens": 1000
+}
+```
+
+### Vector Store Configuration
+
+**File: `config/vector_store.json`**
+
+```json
+{
+  "store_type": "in_memory",
+  "collection_name": "memory",
+  "dimension": 768,
+  "metric": "cosine"
+}
+```
+
+Options:
+- `in_memory`: Fast, no dependencies
+- `chromadb`: Persistent vector storage
+- `faiss`: Fast similarity search
+
+### Benchmark Configuration
+
+**File: `config/*.json`**
+
+```json
+{
+  "context_manager_type": "openai_parser",
+  "dataset_name": "chatbot_conversations",
+  "max_messages": 20,
   "use_embeddings": true,
   "k_retrieval": 5,
-  "api_url": "http://localhost:8000",
-  "vault": "default",
+  "enable_metrics": true,
+  "output_dir": "benchmark_results",
   "params": {
-    "max_memory_items": 10000,
-    "retrieval_top_k": 5
+    "api_url": "http://localhost:58080/v1",
+    "parser_model": "LFM2.5-1.2B-Instruct-Q8_0",
+    "enable_benchmarking": true
   }
 }
 ```
 
-### Available Configs
+## Usage
 
-- `config/baseline.json` - Baseline strategy
-- `config/vector_db.json` - Vector DB memory store
-- `config/knowledge_graph.json` - Knowledge graph memory store
-- `config/muninndb.json` - MuninnDB with API
-- `config/trustgraph.json` - TrustGraph with benchmarking
-- `config/openai_parser.json` - OpenAI parser
+### Python API
 
-## Running Benchmarks
+#### Load Configuration
 
-### Single Benchmark
+```python
+from config.manager import ConfigManager, ContextManagerType, VectorStoreType
 
-```bash
-python3 run_benchmark.py --config config/vector_db.json
+config_mgr = ConfigManager()
+
+# Load model config
+model_config = config_mgr.load_model_config()
+print(model_config.chat_model)  # Qwen3-Coder-Next-Q4_K_M
+
+# Load vector store config
+vector_config = config_mgr.load_vector_store_config()
+print(vector_config.store_type)  # VectorStoreType.IN_MEMORY
+
+# Load benchmark config
+benchmark_config = config_mgr.load_config("config/openai_parser.json")
+print(benchmark_config.context_manager_type)  # ContextManagerType.OPENAI_PARSER
 ```
 
-### All Benchmarks
+#### Run Benchmark
+
+```python
+from benchmark.harness import BenchmarkHarness, BenchmarkConfig
+from config.manager import ContextManagerType
+
+# Configure
+config = BenchmarkConfig(
+    context_manager_type=ContextManagerType.OPENAI_PARSER,
+    dataset_name="chatbot_conversations",
+    max_messages=20,
+    params={
+        "api_url": "http://localhost:58080/v1",
+        "parser_model": "LFM2.5-1.2B-Instruct-Q8_0",
+    }
+)
+
+# Run
+harness = BenchmarkHarness(config)
+result = harness.run_benchmark(messages)
+
+print(f"Context size: {result.context_size} tokens")
+print(f"Response time: {result.response_time_ms:.2f}ms")
+```
+
+#### Use Context Manager Directly
+
+```python
+from context_managers.openai_parser import OpenAICompatibleContextManager
+
+# Create parser (NOT a memory store)
+parser = OpenAICompatibleContextManager(
+    api_url="http://localhost:58080/v1",
+    parser_model="LFM2.5-1.2B-Instruct-Q8_0",
+    k_retrieval=5
+)
+
+# Process messages
+parser.process_message({"role": "user", "content": "Hello, I love Python"})
+parser.process_message({"role": "assistant", "content": "Hi! What do you want to build?"})
+
+# Get context
+context = parser.get_context({"role": "user", "content": "What should I use?"})
+print(context)
+
+# Get benchmark summary
+summary = parser.get_benchmark_summary()
+print(summary)  # {'avg_time_ms': 150.5, ...}
+
+# Reset
+parser.reset()
+```
+
+#### Use Vector DB Store
+
+```python
+from memory_stores.vector_db import VectorDBStore
+
+# In-memory (default)
+store = VectorDBStore(store_type="in_memory", dimension=768)
+
+# Or ChromaDB
+store = VectorDBStore(
+    store_type="chromadb",
+    collection_name="my_collection",
+    api_url="http://localhost:8000"
+)
+
+# Or FAISS
+store = VectorDBStore(store_type="faiss", dimension=768)
+
+# Insert
+vec_id = store.insert("user", "likes", "python", {"timestamp": "2024-01-01"})
+
+# Retrieve
+results = store.retrieve("python programming", k=5)
+for r in results:
+    print(f"{r['value']} (score: {r['score']})")
+
+# Get stats
+print(store.get_stats())
+```
+
+## Dataset Format
+
+### JSONL Format
+
+```json
+{"role": "user", "content": "Hello"}
+{"role": "assistant", "content": "Hi there"}
+{"role": "user", "content": "What can you do?"}
+```
+
+### Conversation ID Format
+
+```json
+{"role": "user", "content": "Hello", "conversation_id": 0}
+{"role": "assistant", "content": "Hi", "conversation_id": 0}
+{"role": "user", "content": "Hello", "conversation_id": 1}
+```
+
+## Strategies
+
+### Baseline
+
+Full conversation history. No parsing or extraction.
+
+```python
+config = BenchmarkConfig(
+    context_manager_type=ContextManagerType.BASELINE,
+    dataset_name="chatbot_conversations"
+)
+```
+
+### OpenAI Parser
+
+Extracts structured information using LLM API.
+
+```python
+config = BenchmarkConfig(
+    context_manager_type=ContextManagerType.OPENAI_PARSER,
+    dataset_name="chatbot_conversations",
+    params={
+        "api_url": "http://localhost:58080/v1",
+        "parser_model": "LFM2.5-1.2B-Instruct-Q8_0",
+    }
+)
+```
+
+### Vector DB
+
+Vector similarity-based retrieval.
+
+```python
+config = BenchmarkConfig(
+    context_manager_type=ContextManagerType.VECTOR_DB,
+    dataset_name="chatbot_conversations",
+    use_embeddings=True,
+    params={
+        "store_type": "in_memory",  # or chromadb, faiss
+        "dimension": 768,
+        "k_retrieval": 5,
+    }
+)
+```
+
+### Knowledge Graph
+
+Relationship-based retrieval.
+
+```python
+config = BenchmarkConfig(
+    context_manager_type=ContextManagerType.KNOWLEDGE_GRAPH,
+    dataset_name="chatbot_conversations",
+    use_embeddings=False,
+)
+```
+
+### MuninnDB
+
+Memory store with OpenAI-compatible API.
+
+```python
+config = BenchmarkConfig(
+    context_manager_type=ContextManagerType.MUNINNDB,
+    dataset_name="chatbot_conversations",
+    params={
+        "api_url": "http://localhost:8000",
+        "vault": "default",
+    }
+)
+```
+
+### TrustGraph
+
+Benchmarkable data stores with OpenAI-compatible API.
+
+```python
+config = BenchmarkConfig(
+    context_manager_type=ContextManagerType.TRUSTGRAPH,
+    dataset_name="chatbot_conversations",
+    params={
+        "api_url": "http://localhost:3000",
+        "vault": "default",
+        "enable_benchmarking": True,
+    }
+)
+```
+
+## Testing
+
+### Run All Tests
 
 ```bash
-python3 run_benchmark.py --compare
+python test_new_system.py
 ```
 
 ### Quick Start
 
 ```bash
-bash quickstart.sh
+./quickstart.sh
 ```
 
-## Testing
+### Run Benchmark
 
 ```bash
-python3 test_memory_system.py
+# Default 20 messages
+./run_benchmark.sh
+
+# Custom size
+./run_benchmark.sh 50
+
+# With dataset name
+./run_benchmark.sh 20 conversation_dataset
 ```
 
-## API Integration
+## Output
 
-The system works with any OpenAI-compatible API server. To use with a real API:
-
-1. Start your OpenAI-compatible server
-2. Update the config with the correct `api_url`
-3. Set the `api_key` if required
-4. Run benchmarks
-
-### Example with Real API
+Results saved to `benchmark_results/`:
 
 ```json
 {
-  "context_manager_type": "muninndb",
-  "api_url": "https://api.openai.com/v1",
-  "api_key": "sk-...",
-  "vault": "default"
+  "context_manager_type": "openai_parser",
+  "dataset_name": "chatbot_conversations",
+  "total_messages": 20,
+  "context_size": 1000,
+  "response_time_ms": 150.5,
+  "memory_usage_mb": 10.2,
+  "metrics": {},
+  "metadata": {
+    "k_retrieval": 5,
+    "use_embeddings": false,
+    "parser_summary": {
+      "total_messages": 20,
+      "avg_time_ms": 150.5,
+      "min_time_ms": 120.0,
+      "max_time_ms": 200.0
+    }
+  }
 }
 ```
 
-## Performance
+## Performance Considerations
 
-### Benchmark Results
+### Caching
 
-| Strategy | Context Size | Response Time |
-|----------|--------------|---------------|
-| Baseline | 146 tokens | 0.03ms |
-| VectorDB | 500 tokens | 16.76ms |
-| KnowledgeGraph | 500 tokens | 10.00ms |
-| MuninnDB | 500 tokens | 23.69ms |
-| TrustGraph | 500 tokens | 1075.84ms |
-| OpenAI Parser | 500 tokens | 10.68ms |
+- Parser results are cached per session
+- Vector DB can use ChromaDB/FAISS for persistent storage
+- Consider implementing request caching for production
 
-## Adding New Memory Stores
+### Async I/O
 
-1. Implement `BaseMemoryStore` interface
-2. Add to `ContextManagerType` enum
-3. Register in harness
+- Can add async support with `aiohttp` for parallel API calls
+- Measure performance impact before implementing
 
-## Adding New Context Managers
+### Memory Usage
 
-1. Implement `BaseContextManager` interface
-2. Add to `ContextManagerType` enum
-3. Register in harness
+- Baseline: O(n) where n = messages
+- Vector DB: O(n * d) where d = embedding dimension
+- Parser: O(n) for parsed data
 
-## License
+## Troubleshooting
 
-MIT
+### API Connection Failed
+
+- Check API URL: `http://localhost:58080/v1`
+- Verify server is running
+- Check firewall settings
+
+### Missing Dependencies
+
+```bash
+# ChromaDB
+pip install chromadb
+
+# FAISS
+pip install faiss
+```
+
+### Dataset Not Found
+
+- Check `data/` directory
+- Verify JSONL format
+- Check file permissions
+
+## API Reference
+
+### ConfigManager
+
+- `load_config(path)`: Load benchmark config
+- `save_config(config, path)`: Save benchmark config
+- `load_model_config(path)`: Load model config
+- `save_model_config(config, path)`: Save model config
+- `load_vector_store_config(path)`: Load vector store config
+- `save_vector_store_config(config, path)`: Save vector store config
+
+### BenchmarkHarness
+
+- `run_benchmark(messages, references)`: Run benchmark
+- `run_comparison(datasets)`: Run across datasets
+- `save_results(results, path)`: Save to file
+
+### OpenAICompatibleContextManager
+
+- `process_message(msg)`: Parse and store
+- `get_context(msg)`: Get relevant context
+- `get_context_size()`: Get token count
+- `reset()`: Clear temporary memory
+- `get_benchmark_summary()`: Performance metrics
+- `get_parsed_history()`: Get all parsed data
+- `get_entity_index()`: Entity → message index
+
+### VectorDBStore
+
+- `insert(entity, relation, value, metadata)`: Insert vector
+- `retrieve(query, k, use_embedding)`: Search
+- `update(id, entity, relation, value)`: Update
+- `delete(id)`: Remove vector
+- `clear()`: Clear all
+- `get_stats()`: Statistics

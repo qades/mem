@@ -1,39 +1,63 @@
 #!/bin/bash
-# Quick-start script for the memory management system
+
+# Quickstart script for the memory/context management system
+# This script sets up and runs a quick benchmark test
 
 set -e
 
-echo "============================================================"
-echo "Memory Management System - Quick Start"
-echo "============================================================"
-echo ""
+echo "=========================================="
+echo "Memory/Context Management System Setup"
+echo "=========================================="
 
-# Check Python version
-echo "Checking Python version..."
-python3 --version
+# Create directories
+mkdir -p data benchmark_results
 
-# Install dependencies
-echo ""
-echo "Installing dependencies..."
-pip3 install -r requirements.txt --quiet --break-system-packages
+# Create test dataset (20 messages)
+echo "Creating test dataset with 20 messages..."
+python -c "
+import sys
+sys.path.insert(0, '.')
+from data.test_dataset import create_test_dataset
+create_test_dataset('data/test_dataset.jsonl', num_messages=20)
+"
 
-# Create test dataset
+# Run configuration tests
 echo ""
-echo "Creating test dataset..."
-python3 -c "from data.test_dataset import create_test_dataset; create_test_dataset()"
+echo "Testing configuration..."
+python -c "
+import sys
+sys.path.insert(0, '.')
+from config.manager import ConfigManager, ContextManagerType, VectorStoreType
 
-# Run tests
+config_mgr = ConfigManager()
+
+# Check model config
+model_config = config_mgr.load_model_config()
+print(f'✓ Model config loaded: {model_config.chat_model}')
+assert model_config.api_url == 'http://localhost:58080/v1'
+
+# Check vector store config
+vector_config = config_mgr.load_vector_store_config()
+print(f'✓ Vector store config: {vector_config.store_type.value}')
+
+# Check benchmark configs
+for config_name in ['baseline', 'openai_parser', 'vector_db', 'knowledge_graph', 'muninndb', 'trustgraph']:
+    config = config_mgr.load_config(f'config/{config_name}.json')
+    print(f'✓ {config_name} config loaded')
+"
+
+# Run quick test
 echo ""
-echo "Running tests..."
-python3 test_memory_system.py
+echo "Running quick system test..."
+python test_new_system.py
 
 echo ""
-echo "============================================================"
+echo "=========================================="
+echo "Setup complete! Ready for benchmark runs."
+echo "=========================================="
+echo ""
 echo "To run benchmarks:"
-echo "  python3 run_benchmark.py --config config/vector_db.json"
-echo "  python3 run_benchmark.py --config config/muninndb.json"
-echo "  python3 run_benchmark.py --config config/trustgraph.json"
+echo "  python benchmark/harness.py"
 echo ""
-echo "To start OpenAI-compatible test server:"
-echo "  python3 server.py --port 8000"
-echo "============================================================"
+echo "Or with a specific config:"
+echo "  python -c \"from benchmark.harness import BenchmarkHarness, BenchmarkConfig; from config.manager import ContextManagerType; h = BenchmarkHarness(BenchmarkConfig(ContextManagerType.OPENAI_PARSER, 'chatbot_conversations', max_messages=20, params={'api_url': 'http://localhost:58080/v1'})); print(h.run_benchmark([{'role': 'user', 'content': 'test'}]))\""

@@ -1,13 +1,13 @@
 {
   "context_manager_type": "knowledge_graph",
   "dataset_name": "chatbot_conversations",
+  "max_messages": 20,
   "use_embeddings": false,
   "k_retrieval": 5,
+  "enable_metrics": true,
+  "output_dir": "benchmark_results",
   "params": {
-    "max_memory_items": 1000,
-    "embedding_model": "all-MiniLM-L6-v2",
-    "relation_types": ["causes", "depends_on", "references", "contradicts"],
-    "retrieval_threshold": 0.7,
-    "context_window": 5
+    "k_retrieval": 5,
+    "enable_benchmarking": true
   }
 }

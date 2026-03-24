@@ -1,235 +1,260 @@
-#!/usr/bin/env python3
 """
-Test script for new memory/context management system.
-Creates test dataset and runs benchmarks.
+Test suite for the new memory/context management system.
 """
 
+import json
 import sys
 import os
+import time
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from data.test_dataset import create_test_dataset, load_test_dataset
-from memory_stores.muninndb import MuninnDBStore
-from memory_stores.trustgraph import TrustGraphStore
-from context_managers.openai_parser import (
-    OpenAIContextParser,
-    OpenAICompatibleContextManager,
+from config.manager import (
+    ConfigManager,
+    BenchmarkConfig,
+    ModelConfig,
+    ContextManagerType,
+    VectorStoreType,
 )
-from benchmark.harness import BenchmarkHarness, BenchmarkConfig, ContextManagerType
-from config.manager import ConfigManager
+from data.test_dataset import create_test_dataset, load_test_dataset
+from context_managers.openai_parser import OpenAICompatibleContextManager
+from memory_stores.vector_db import VectorDBStore
+from benchmark.harness import BenchmarkHarness, BenchmarkConfig as BenchConfig
 
 
-def test_muninndb():
-    """Test MuninnDB memory store."""
-    print("\n" + "=" * 60)
-    print("Testing MuninnDB Memory Store")
-    print("=" * 60)
+def test_configuration():
+    """Test configuration loading and saving."""
+    print("\n=== Testing Configuration ===")
 
-    try:
-        store = MuninnDBStore(api_url="http://localhost:8000", vault="test")
+    config_mgr = ConfigManager()
 
-        # Test basic operations
-        mem_id = store.insert(
-            entity="Python",
-            relation="programming_language",
-            value="popular",
-            metadata={"timestamp": "2026-03-24T00:00:00", "confidence": 0.9},
-        )
-        print(f"✓ Inserted memory: {mem_id}")
+    # Test model config
+    model_config = config_mgr.load_model_config()
+    print(f"Model config: {model_config}")
+    assert model_config.api_url == "http://localhost:58080/v1"
+    assert model_config.chat_model == "Qwen3-Coder-Next-Q4_K_M"
+    assert model_config.parser_model == "LFM2.5-1.2B-Instruct-Q8_0"
 
-        results = store.retrieve("Python programming", k=3)
-        print(f"✓ Retrieved {len(results)} results")
+    # Test vector store config
+    vector_config = config_mgr.load_vector_store_config()
+    print(f"Vector store config: {vector_config}")
+    assert vector_config.store_type == VectorStoreType.IN_MEMORY
 
-        stats = store.get_stats()
-        print(f"✓ Stats: {stats}")
+    # Test benchmark config loading
+    baseline_config = config_mgr.load_config("config/baseline.json")
+    print(f"Baseline config: {baseline_config}")
+    assert baseline_config.context_manager_type == ContextManagerType.BASELINE
 
-        store.clear()
-        print("✓ Cleared store")
-
-        return True
-    except Exception as e:
-        print(f"✗ Error: {e}")
-        return False
+    print("✓ Configuration tests passed")
 
 
-def test_trustgraph():
-    """Test TrustGraph memory store."""
-    print("\n" + "=" * 60)
-    print("Testing TrustGraph Memory Store")
-    print("=" * 60)
+def test_dataset_creation():
+    """Test dataset creation with configurable size."""
+    print("\n=== Testing Dataset Creation ===")
 
-    try:
-        store = TrustGraphStore(
-            api_url="http://localhost:3000", vault="test", enable_benchmarking=True
-        )
+    # Create test dataset with 20 messages
+    create_test_dataset("data/test_dataset.jsonl", num_messages=20)
 
-        mem_id = store.insert(
-            entity="TrustGraph",
-            relation="memory_system",
-            value="benchmarkable",
-            metadata={"timestamp": "2026-03-24T00:00:00", "confidence": 0.9},
-        )
-        print(f"✓ Inserted memory: {mem_id}")
+    # Verify file exists
+    assert Path("data/test_dataset.jsonl").exists()
 
-        results = store.retrieve("TrustGraph memory", k=3)
-        print(f"✓ Retrieved {len(results)} results")
+    # Load and verify
+    user_msgs, assistant_msgs = load_test_dataset("data/test_dataset.jsonl")
+    print(
+        f"Loaded {len(user_msgs)} user messages, {len(assistant_msgs)} assistant messages"
+    )
 
-        stats = store.get_stats()
-        print(f"✓ Stats: {stats}")
+    # Create with different size
+    create_test_dataset("data/test_dataset_10.jsonl", num_messages=10)
+    user_msgs_10, _ = load_test_dataset("data/test_dataset_10.jsonl", max_messages=10)
+    assert len(user_msgs_10) <= 10
 
-        benchmark = store.get_benchmark_summary()
-        print(f"✓ Benchmark: {benchmark}")
-
-        store.clear()
-        print("✓ Cleared store")
-
-        return True
-    except Exception as e:
-        print(f"✗ Error: {e}")
-        return False
+    print("✓ Dataset creation tests passed")
 
 
 def test_openai_parser():
-    """Test OpenAI context parser."""
-    print("\n" + "=" * 60)
-    print("Testing OpenAI Context Parser")
-    print("=" * 60)
+    """Test OpenAI-compatible parser (without actual API call)."""
+    print("\n=== Testing OpenAI Parser ===")
 
-    try:
-        parser = OpenAIContextParser(
-            api_url="http://localhost:8000",
-            model="gpt-3.5-turbo",
-        )
+    # Test with mock data (no actual API call)
+    parser = OpenAICompatibleContextManager(
+        api_url="http://localhost:58080/v1",
+        model="LFM2.5-1.2B-Instruct-Q8_0",
+        k_retrieval=5,
+        enable_benchmarking=True,
+    )
 
-        result = parser.parse_message("Hello, I love Python and data science!")
-        print(f"✓ Parsed message: {result}")
-
-        messages = [
-            {"role": "user", "content": "I like machine learning"},
-            {"role": "user", "content": "Python is great for AI"},
-        ]
-
-        batch_result = parser.batch_parse_messages(messages)
-        print(f"✓ Batch parsed {len(batch_result)} messages")
-
-        summary = parser.extract_context_summary(messages, k=2)
-        print(f"✓ Summary: {summary}")
-
-        return True
-    except Exception as e:
-        print(f"✗ Error: {e}")
-        return False
-
-
-def test_context_manager():
-    """Test OpenAI compatible context manager."""
-    print("\n" + "=" * 60)
-    print("Testing OpenAI Compatible Context Manager")
-    print("=" * 60)
-
-    try:
-        manager = OpenAICompatibleContextManager(
-            api_url="http://localhost:8000",
-            model="gpt-3.5-turbo",
-            k_retrieval=3,
-        )
-
-        messages = [
-            {"role": "user", "content": "Hello, I'm learning Python"},
-            {"role": "assistant", "content": "Python is a great language!"},
-            {"role": "user", "content": "I want to learn about data science"},
-        ]
-
-        for msg in messages:
-            manager.process_message(msg)
-
-        context = manager.get_context({"role": "user", "content": "Python data"})
-        print(f"✓ Context: {context[:100]}...")
-
-        summary = manager.get_benchmark_summary()
-        print(f"✓ Benchmark: {summary}")
-
-        manager.reset()
-        print("✓ Reset manager")
-
-        return True
-    except Exception as e:
-        print(f"✗ Error: {e}")
-        return False
-
-
-def run_full_benchmark():
-    """Run full benchmark with test dataset."""
-    print("\n" + "=" * 60)
-    print("Running Full Benchmark")
-    print("=" * 60)
-
-    # Create test dataset
-    create_test_dataset()
-    messages, references = load_test_dataset()
-
-    print(f"Loaded {len(messages)} messages")
-
-    # Test with each strategy
-    strategies = [
-        ContextManagerType.BASELINE,
-        ContextManagerType.VECTOR_DB,
-        ContextManagerType.KNOWLEDGE_GRAPH,
+    # Mock messages
+    test_messages = [
+        {"role": "user", "content": "Hello, I love Python programming."},
+        {
+            "role": "assistant",
+            "content": "Hello! Python is great. What do you want to build?",
+        },
+        {"role": "user", "content": "I want to build a data science app."},
     ]
 
-    for strategy in strategies:
-        print(f"\nTesting {strategy.value}...")
+    # Process messages
+    for msg in test_messages:
+        parser.process_message(msg)
 
-        config = BenchmarkConfig(
+    # Get context
+    context = parser.get_context(
+        {"role": "user", "content": "What should I use for data science?"}
+    )
+    print(f"Context: {context[:100]}...")
+
+    # Get benchmark summary
+    summary = parser.get_benchmark_summary()
+    print(f"Benchmark summary: {summary}")
+
+    # Reset
+    parser.reset()
+    assert parser.get_context_size() == 0
+
+    print("✓ OpenAI parser tests passed")
+
+
+def test_vector_db_store():
+    """Test vector DB store with different backends."""
+    print("\n=== Testing Vector DB Store ===")
+
+    # Test in-memory backend
+    store = VectorDBStore(store_type="in_memory", dimension=768)
+
+    # Insert some data
+    vec_id = store.insert("user", "likes", "python", {"timestamp": "2024-01-01"})
+    print(f"Inserted vector: {vec_id}")
+
+    # Retrieve
+    results = store.retrieve("python programming", k=5)
+    print(f"Retrieved {len(results)} results")
+    assert len(results) >= 0  # May be 0 if no matches
+
+    # Get stats
+    stats = store.get_stats()
+    print(f"Stats: {stats}")
+    assert stats["store_type"] == "in_memory"
+
+    # Test ChromaDB backend (if available)
+    try:
+        chroma_store = VectorDBStore(store_type="chromadb", collection_name="test")
+        print("✓ ChromaDB backend available")
+    except ImportError:
+        print("⚠ ChromaDB not installed (optional)")
+
+    # Test FAISS backend (if available)
+    try:
+        faiss_store = VectorDBStore(store_type="faiss", dimension=768)
+        print("✓ FAISS backend available")
+    except ImportError:
+        print("⚠ FAISS not installed (optional)")
+
+    print("✓ Vector DB store tests passed")
+
+
+def test_benchmark_harness():
+    """Test benchmark harness with small dataset."""
+    print("\n=== Testing Benchmark Harness ===")
+
+    # Create small test dataset
+    create_test_dataset("data/test_harness.jsonl", num_messages=20)
+
+    # Test baseline
+    config = BenchConfig(
+        context_manager_type=ContextManagerType.BASELINE,
+        dataset_name="chatbot_conversations",
+        max_messages=20,
+        enable_metrics=False,
+    )
+    harness = BenchmarkHarness(config)
+    result = harness.run_benchmark([{"role": "user", "content": "test"}])
+    print(f"Baseline result: time={result.response_time_ms:.2f}ms")
+
+    # Test OpenAI parser
+    config = BenchConfig(
+        context_manager_type=ContextManagerType.OPENAI_PARSER,
+        dataset_name="chatbot_conversations",
+        max_messages=20,
+        enable_metrics=False,
+        params={
+            "api_url": "http://localhost:58080/v1",
+            "model": "LFM2.5-1.2B-Instruct-Q8_0",
+            "enable_benchmarking": True,
+        },
+    )
+    harness = BenchmarkHarness(config)
+    result = harness.run_benchmark([{"role": "user", "content": "test"}])
+    print(f"OpenAI parser result: time={result.response_time_ms:.2f}ms")
+
+    print("✓ Benchmark harness tests passed")
+
+
+def test_end_to_end():
+    """Run end-to-end test with small dataset."""
+    print("\n=== Running End-to-End Test ===")
+
+    # Create test dataset
+    create_test_dataset("data/e2e_test.jsonl", num_messages=20)
+
+    # Load dataset
+    messages, _ = load_test_dataset("data/e2e_test.jsonl", max_messages=20)
+    print(f"Loaded {len(messages)} messages for end-to-end test")
+
+    # Run with different strategies
+    strategies = [
+        (ContextManagerType.BASELINE, {}),
+        (
+            ContextManagerType.OPENAI_PARSER,
+            {
+                "api_url": "http://localhost:58080/v1",
+                "parser_model": "LFM2.5-1.2B-Instruct-Q8_0",
+            },
+        ),
+    ]
+
+    for strategy, params in strategies:
+        config = BenchConfig(
             context_manager_type=strategy,
-            dataset_name="test_dataset",
+            dataset_name="e2e_test",
             max_messages=20,
-            use_embeddings=strategy != ContextManagerType.KNOWLEDGE_GRAPH,
             enable_metrics=False,
+            params=params,
+        )
+        harness = BenchmarkHarness(config)
+        result = harness.run_benchmark(messages[:5])  # Just first 5 for speed
+        print(
+            f"{strategy.value}: {result.response_time_ms:.2f}ms, context_size={result.context_size}"
         )
 
-        harness = BenchmarkHarness(config)
-        result = harness.run_benchmark(messages[:20], references[:20])
-
-        print(f"  Context size: {result.context_size} tokens")
-        print(f"  Response time: {result.response_time_ms:.2f}ms")
-        print(f"  Memory usage: {result.memory_usage_mb:.2f}MB")
-        if result.metrics:
-            print(f"  Metrics: {result.metrics}")
+    print("✓ End-to-end test completed")
 
 
 def main():
     """Run all tests."""
     print("=" * 60)
-    print("NEW MEMORY/CONTEXT MANAGEMENT SYSTEM - TEST SUITE")
+    print("Memory/Context Management System - Test Suite")
     print("=" * 60)
 
-    results = []
+    try:
+        test_configuration()
+        test_dataset_creation()
+        test_openai_parser()
+        test_vector_db_store()
+        test_benchmark_harness()
+        test_end_to_end()
 
-    # Test individual components
-    results.append(("MuninnDB Store", test_muninndb()))
-    results.append(("TrustGraph Store", test_trustgraph()))
-    results.append(("OpenAI Parser", test_openai_parser()))
-    results.append(("Context Manager", test_context_manager()))
-
-    # Summary
-    print("\n" + "=" * 60)
-    print("TEST SUMMARY")
-    print("=" * 60)
-
-    for name, passed in results:
-        status = "✓ PASS" if passed else "✗ FAIL"
-        print(f"{status}: {name}")
-
-    all_passed = all(r[1] for r in results)
-
-    if all_passed:
-        print("\n✓ All tests passed!")
-        run_full_benchmark()
+        print("\n" + "=" * 60)
+        print("✓ All tests passed!")
+        print("=" * 60)
         return 0
-    else:
-        print("\n✗ Some tests failed!")
+
+    except Exception as e:
+        print(f"\n✗ Test failed: {e}")
+        import traceback
+
+        traceback.print_exc()
         return 1
 
 

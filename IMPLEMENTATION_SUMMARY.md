@@ -1,200 +1,163 @@
-# Memory Management System - Implementation Summary
+# Implementation Summary
 
-## What Was Implemented
+This document summarizes the implementation of the new memory/context management system.
 
-### 1. New Memory Stores
+## What Changed
 
-#### MuninnDBStore (`memory_stores/muninndb.py`)
-- OpenAI-compatible API integration
-- Vector embeddings via API
-- Entity extraction via LLM
-- Persistent storage with confidence scoring
-- Support for vault scoping
+### 1. Configuration System
 
-#### TrustGraphStore (`memory_stores/trustgraph.py`)
-- OpenAI-compatible API integration
-- Benchmarkable data structures
-- Performance tracking with detailed metrics
-- Entity extraction via LLM
-- Support for vault scoping
+**File: `config/manager.py`**
 
-#### Enhanced Existing Stores
-- VectorDBStore: Already working, enhanced with OpenAI API support
-- KnowledgeGraphStore: Already working, enhanced with OpenAI API support
+- Added `VectorStoreType` enum for ChromaDB/FAISS/in_memory
+- Updated `ModelConfig`:
+  - `chat_model`: Default "Qwen3-Coder-Next-Q4_K_M"
+  - `parser_model`: Default "LFM2.5-1.2B-Instruct-Q8_0"
+  - `api_url`: Default "http://localhost:58080/v1"
+- Updated `BenchmarkConfig` with `params` dict for strategy-specific settings
 
-### 2. New Context Managers
+### 2. OpenAI-Compatible Parser
 
-#### OpenAICompatibleContextManager (`context_managers/openai_parser.py`)
-- Fast context parsing using OpenAI-compatible LLM API
-- Entity extraction
-- Relation extraction
-- Fact extraction
-- Benchmarking support
+**File: `context_managers/openai_parser.py`**
 
-### 3. Test Infrastructure
+- **NOT a memory store** - only parses and extracts structured information
+- Parses messages using LLM API for entities, relations, facts, preferences
+- Keeps parsed data in temporary memory during session
+- Does NOT persist to database
 
-#### OpenAI-Compatible Test Server (`server.py`)
-- HTTP server with OpenAI-compatible endpoints
-- `/chat/completions` - Chat completions with context parsing
-- `/embeddings` - Embedding generation
-- `/memories` - Memory CRUD operations
-- `/search` - Semantic search
-- `/stats` - Statistics
-- `/health` - Health check
+Key methods:
+- `parse_message()`: Extract structured data from message
+- `process_message()`: Parse and store temporarily
+- `get_context()`: Retrieve relevant parsed information
+- `get_benchmark_summary()`: Performance metrics
 
-#### Test Dataset (`data/test_dataset.py`)
-- 20 messages for quick testing
-- JSONL format
-- Easy to load and use
+### 3. Vector DB Store
 
-### 4. Configuration Files
+**File: `memory_stores/vector_db.py`**
 
-- `config/baseline.json` - Baseline strategy
-- `config/vector_db.json` - Vector DB memory store
-- `config/knowledge_graph.json` - Knowledge graph memory store
-- `config/muninndb.json` - MuninnDB with API
-- `config/trustgraph.json` - TrustGraph with benchmarking
-- `config/openai_parser.json` - OpenAI parser
+- Multi-backend support: ChromaDB, FAISS, in-memory
+- Configurable via `store_type` parameter
+- Default: in-memory (no dependencies)
+- Optional: ChromaDB, FAISS (install separately)
 
-### 5. Documentation
+Features:
+- Vector embeddings with configurable dimension
+- Cosine similarity and BM25 retrieval
+- CRUD operations
+- Statistics and management
 
-- `README.md` - Updated with new memory management system
-- `DOCUMENTATION.md` - Comprehensive documentation
-- `quickstart.sh` - Quick start script
-- `test_memory_system.py` - Test suite
-- `test_new_system.py` - Comprehensive test suite
+### 4. Test Dataset
 
-## Test Results
+**File: `data/test_dataset.py`**
 
-### All Tests Passing
+- Configurable excerpt size: `create_test_dataset(num_messages=N)`
+- Default: 20 messages
+- Can generate conversation datasets with multiple short conversations
+- Load with optional limit: `load_test_dataset(max_messages=N)`
 
-```
-✓ PASS: VectorDB Store
-✓ PASS: KnowledgeGraph Store
-✓ PASS: Context Manager
-✓ PASS: Full Pipeline
-✓ PASS: MuninnDB Store
-✓ PASS: TrustGraph Store
-✓ PASS: OpenAI Parser
-```
+### 5. Dataset Loader
 
-### Benchmark Results
+**File: `benchmark/dataset_loader.py`**
 
-| Strategy | Context Size | Response Time |
-|----------|--------------|---------------|
-| Baseline | 146 tokens | 0.03ms |
-| VectorDB | 500 tokens | 9.16ms |
-| KnowledgeGraph | 500 tokens | 0.17ms |
-| MuninnDB | 500 tokens | 16.90ms |
-| TrustGraph | 500 tokens | 1479.90ms |
-| OpenAI Parser | 500 tokens | 5.77ms |
+- Load datasets with configurable message limits
+- Support for test, conversation, and custom JSONL datasets
+- Load from directories
+- List available datasets
 
-## Usage Examples
+### 6. Benchmark Harness
 
-### Quick Start
+**File: `benchmark/harness.py`**
+
+- Updated to support new configuration system
+- Supports all context manager types
+- Passes `params` dict to context managers
+- Returns detailed benchmark results
+
+### 7. Configuration Files
+
+- `config/model.json`: Model settings (localhost:58080/v1)
+- `config/vector_store.json`: Vector store backend
+- `config/baseline.json`: Baseline strategy config
+- `config/openai_parser.json`: OpenAI parser config
+- `config/vector_db.json`: Vector DB config
+- `config/knowledge_graph.json`: Knowledge graph config
+- `config/muninndb.json`: MuninnDB config
+- `config/trustgraph.json`: TrustGraph config
+
+### 8. Test Suite
+
+**File: `test_new_system.py`**
+
+- Tests configuration loading
+- Tests dataset creation with configurable size
+- Tests OpenAI parser (mock data)
+- Tests vector DB store (all backends)
+- Tests benchmark harness
+- End-to-end test
+
+### 9. Scripts
+
+**File: `quickstart.sh`**
+
+- Creates directories
+- Generates test dataset
+- Validates configuration
+- Runs test suite
+
+**File: `run_benchmark.sh`**
+
+- Accepts configurable excerpt size
+- Runs benchmark for multiple strategies
+- Saves results to `benchmark_results/`
+
+## Key Design Decisions
+
+### OpenAI Parser is NOT a Memory Store
+
+The parser only:
+- Extracts structured information from messages
+- Keeps parsed data in temporary memory
+- Does NOT persist to any database
+
+This allows it to work with any memory store (VectorDB, KnowledgeGraph, etc.) for persistent storage.
+
+### Vector Store Backends
+
+- **in_memory**: Default, fast, no dependencies
+- **ChromaDB**: For persistent vector storage
+- **FAISS**: For fast similarity search
+
+Backends selected via `store_type` parameter.
+
+### Configurable Excerpt Size
+
+- Dataset creation: `num_messages=N`
+- Dataset loading: `max_messages=N`
+- Benchmark: `max_messages=N`
+
+All three layers respect the limit.
+
+## Testing
 
 ```bash
-# Run quickstart script
-bash quickstart.sh
+# Run quick setup
+./quickstart.sh
 
-# Or manually
-python3 -c "from data.test_dataset import create_test_dataset; create_test_dataset()"
-python3 test_memory_system.py
+# Run benchmark with 20 messages
+./run_benchmark.sh 20
+
+# Run with custom size
+./run_benchmark.sh 50 conversation_dataset
+
+# Run tests directly
+python test_new_system.py
 ```
-
-### Run Benchmarks
-
-```bash
-python3 run_benchmark.py --config config/vector_db.json
-python3 run_benchmark.py --config config/muninndb.json
-python3 run_benchmark.py --config config/trustgraph.json
-python3 run_benchmark.py --config config/openai_parser.json
-```
-
-### Start Test Server
-
-```bash
-python3 server.py --port 8000
-```
-
-### Use in Code
-
-```python
-from memory_stores.muninndb import MuninnDBStore
-from context_managers.memory_based import MemoryBasedContextManager
-
-# Create memory store
-store = MuninnDBStore(
-    api_url="http://localhost:8000",
-    vault="default"
-)
-
-# Create context manager
-manager = MemoryBasedContextManager(
-    memory_store=store,
-    use_embeddings=True,
-    k_retrieval=5
-)
-
-# Process messages
-manager.process_message({"role": "user", "content": "Hello"})
-
-# Get context
-context = manager.get_context({"role": "user", "content": "How are you?"})
-```
-
-## Key Features
-
-1. **OpenAI-Compatible API**: Works with any OpenAI-compatible server
-2. **Multiple Memory Stores**: VectorDB, KnowledgeGraph, MuninnDB, TrustGraph
-3. **Benchmarking Support**: TrustGraph includes detailed performance metrics
-4. **Fast Context Parsing**: OpenAI parser provides quick context extraction
-5. **Flexible Configuration**: JSON config files for easy setup
-6. **Comprehensive Testing**: Test suite with 20-message dataset
-
-## Integration Points
-
-1. **Benchmark Harness**: All new strategies integrated into existing harness
-2. **Config Manager**: New strategies registered in ContextManagerType enum
-3. **Dataset Loader**: Updated to handle test dataset
-4. **Memory Store Interface**: All stores implement BaseMemoryStore
-
-## Files Modified
-
-- `memory_stores/muninndb.py` - New file
-- `memory_stores/trustgraph.py` - New file
-- `context_managers/openai_parser.py` - New file
-- `config/manager.py` - Updated with new ContextManagerType values
-- `benchmark/harness.py` - Updated to support new strategies
-- `benchmark/dataset_loader.py` - Updated error handling
-- `config/muninndb.json` - New config
-- `config/trustgraph.json` - New config
-- `config/openai_parser.json` - New config
-- `server.py` - New OpenAI-compatible test server
-- `data/test_dataset.py` - New test dataset generator
-- `requirements.txt` - Updated dependencies
-- `README.md` - Updated documentation
-- `DOCUMENTATION.md` - New comprehensive documentation
-- `quickstart.sh` - New quick start script
-- `test_memory_system.py` - New test suite
-- `test_new_system.py` - New comprehensive test suite
 
 ## Next Steps
 
-To use with real OpenAI API:
-
-1. Start your OpenAI-compatible server (or use real API)
-2. Update config with correct `api_url` and `api_key`
-3. Run benchmarks with new configs
-
-## Conclusion
-
-The system is fully implemented and tested with:
-- ✓ 4 new memory store implementations
-- ✓ 1 new context manager
-- ✓ OpenAI-compatible test server
-- ✓ 20-message test dataset
-- ✓ Comprehensive benchmarking
-- ✓ Full documentation
-- ✓ Quick start script
-- ✓ All tests passing
+For production use:
+1. Replace test server with real LLM API
+2. Use real conversation datasets (Babilong/ProLong)
+3. Add actual LLM response generation
+4. Implement proper caching
+5. Add monitoring/logging
+6. Test with real APIs

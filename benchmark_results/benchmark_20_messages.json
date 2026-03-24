@@ -1,0 +1,46 @@
+{
+  "summary": "Benchmark Results - 20 Messages",
+  "configuration": {
+    "api_url": "http://localhost:58080/v1",
+    "parser_model": "LFM2.5-1.2B-Instruct-Q8_0",
+    "chat_model": "Qwen3-Coder-Next-Q4_K_M",
+    "excerpt_size": 20
+  },
+  "results": [
+    {
+      "strategy": "baseline",
+      "context_size_tokens": 249,
+      "response_time_ms": 0.03,
+      "notes": "Full history, fastest"
+    },
+    {
+      "strategy": "openai_parser",
+      "context_size_tokens": 1000,
+      "response_time_ms": 25892,
+      "performance_breakdown": {
+        "total_messages": 20,
+        "avg_time_per_message_ms": 1294,
+        "min_time_ms": 901,
+        "max_time_ms": 1909,
+        "total_parsing_time_ms": 25890
+      },
+      "notes": "LLM extraction, slowest due to local inference"
+    },
+    {
+      "strategy": "vector_db",
+      "context_size_tokens": 500,
+      "response_time_ms": 35.57,
+      "notes": "Similarity search, balanced approach"
+    }
+  ],
+  "recommendations": [
+    "For speed: Use Baseline",
+    "For context efficiency: Use Vector DB",
+    "For structured data extraction: Use OpenAI Parser (accept latency tradeoff)"
+  ],
+  "notes": [
+    "Parser latency is high due to local LLM inference",
+    "With remote API (e.g., OpenAI), latency would be different",
+    "Vector DB provides good balance of speed and context reduction"
+  ]
+}

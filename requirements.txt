@@ -1,18 +1,18 @@
-# Requirements for context management benchmark harness with new memory stores
+# Requirements
 
 # Core dependencies
-typing-extensions>=4.0.0
-
-# Dataset download and processing
 requests>=2.31.0
-datasets>=2.14.0
-huggingface-hub>=0.20.0
+python-dateutil>=2.8.2
 
-# Memory stores (OpenAI-compatible API)
-# For MuninnDB, TrustGraph-AI, and OpenAI-compatible parsing
-# These work with any OpenAI-compatible API server
+# Vector stores (optional)
+# chromadb>=0.4.0  # For ChromaDB backend
+# faiss-cpu>=1.8.0  # For FAISS backend
 
-# Optional: for advanced features
-# scikit-learn  # For advanced metrics
-# sentence-transformers  # For better embeddings
-# torch  # For deep learning models
+# Development
+pytest>=7.4.0
+black>=23.0.0
+flake8>=6.0.0
+
+# Documentation
+sphinx>=7.0.0
+myst-parser>=2.0.0
