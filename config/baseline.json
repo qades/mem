@@ -1,0 +1,9 @@
+{
+  "context_manager_type": "baseline",
+  "dataset_name": "chatbot_conversations",
+  "params": {
+    "max_history_length": 10000,
+    "include_system_messages": true,
+    "token_budget": 4000
+  }
+}

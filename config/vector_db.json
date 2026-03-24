@@ -1,0 +1,14 @@
+{
+  "context_manager_type": "vector_db",
+  "dataset_name": "chatbot_conversations",
+  "use_embeddings": true,
+  "k_retrieval": 5,
+  "params": {
+    "max_memory_items": 10000,
+    "embedding_model": "all-MiniLM-L6-v2",
+    "retrieval_top_k": 5,
+    "retrieval_threshold": 0.75,
+    "chunk_size": 512,
+    "chunk_overlap": 50
+  }
+}

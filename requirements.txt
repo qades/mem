@@ -1,0 +1,14 @@
+# Requirements for context management benchmark harness
+
+# Core dependencies
+typing-extensions>=4.0.0
+
+# Dataset download and processing
+requests>=2.31.0
+datasets>=2.14.0
+huggingface-hub>=0.20.0
+
+# Optional: for advanced features
+# scikit-learn  # For advanced metrics
+# sentence-transformers  # For better embeddings
+# torch  # For deep learning models
