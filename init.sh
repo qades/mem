@@ -32,9 +32,9 @@ membench-quiet() {
     membench "$@" 2>/dev/null
 }
 
-# Alternative: Only filter lines containing warning patterns
+# Alternative: Only filter lines containing warning patterns (filters both stdout and stderr)
 membench-clean() {
-    membench "$@" 2>&1 | grep -v "PydanticDeprecated\|deprecat\|warning:"
+    membench "$@" 2>&1 | grep -v -E "PydanticDeprecated|deprecat|warning:|class SearchInterface|class ToolCallMessage|warnings\.warn|type: ResponseFormatType"
 }
 
 echo "MemBench environment initialized."

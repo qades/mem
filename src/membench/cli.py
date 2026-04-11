@@ -51,6 +51,11 @@ def cmd_list_datasets(args):
     print("\nAvailable Datasets:")
     print("=" * 60)
     
+    # Search recursively for dataset files
+    def find_dataset_files(pattern):
+        matches = list(data_dir.rglob(pattern))
+        return [m for m in matches if m.stat().st_size > 1000]  # Filter out tiny/empty files
+    
     dataset_files = {
         "locomo": ("LoCoMo", "Long Context Monitoring benchmark"),
         "babilong": ("BABILong", "Long-context QA benchmark"),
@@ -60,7 +65,9 @@ def cmd_list_datasets(args):
     }
     
     for key, (name, desc) in dataset_files.items():
-        exists = (data_dir / f"{key}.jsonl").exists() or (data_dir / f"{key}_unified.jsonl").exists()
+        # Search recursively for files matching pattern
+        files = find_dataset_files(f"{key}.jsonl") + find_dataset_files(f"{key}_unified.jsonl")
+        exists = len(files) > 0
         status = "✓" if exists else "✗"
         print(f"  {status} {name:15} - {desc}")
     

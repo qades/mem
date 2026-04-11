@@ -80,6 +80,9 @@ pip install -e ".[all]"
 
 # Or install selectively
 pip install -e ".[mem0,zep,letta]"
+
+# Initialize environment (suppresses Pydantic warnings from external libs)
+source init.sh
 ```
 
 ### Using Docker (Recommended)
@@ -98,6 +101,9 @@ docker-compose -f docker/docker-compose.yml --profile benchmark run -e BENCHMARK
 ### CLI Usage
 
 ```bash
+# Initialize environment first (suppresses warnings)
+source init.sh
+
 # List available memory stores
 membench list-stores
 
@@ -110,6 +116,8 @@ membench run --config quick
 # Run specific stores on specific datasets
 membench run --stores mem0 zep --datasets locomo babilong
 ```
+
+**Note:** Some memory libraries (graphiti, letta) emit Pydantic V2 deprecation warnings at import time that cannot be suppressed via `PYTHONWARNINGS`. Use `membench-quiet` (after sourcing `init.sh`) or append `2>/dev/null` to hide them.
 
 ## Project Structure
 
