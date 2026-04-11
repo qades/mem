@@ -64,7 +64,7 @@ membench run --config quick
 membench run --stores mem0 zep --datasets locomo babilong
 ```
 
-**Note:** Some memory libraries (graphiti, letta) emit Pydantic V2 deprecation warnings at import time. The `init.sh` script sets `PYTHONWARNINGS` to suppress these. Alternatively, you can add `export PYTHONWARNINGS="ignore::pydantic.warnings.PydanticDeprecatedSince20"` to your `~/.bashrc` or `~/.zshrc`.
+**Note:** Some memory libraries (graphiti, letta) emit Pydantic V2 deprecation warnings at import time that cannot be suppressed via `PYTHONWARNINGS`. Use `membench-quiet` (after sourcing `init.sh`) or append `2>/dev/null` to hide them.
 
 ## Project Structure
 

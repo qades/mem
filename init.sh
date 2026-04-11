@@ -2,19 +2,16 @@
 #
 # MemBench Environment Initialization Script
 #
-# Source this script before using membench to suppress Pydantic deprecation
-# warnings from external libraries (graphiti, letta).
+# Source this script before using membench to set up the environment.
 #
 # Usage:
 #   source init.sh
-#   membench list-stores
+#   membench list-stores              # Shows warnings
+#   membench-quiet list-stores        # Hides warnings (stderr filtered)
 #
 # Or make it permanent by adding to your ~/.bashrc or ~/.zshrc:
-#   export PYTHONWARNINGS="ignore::pydantic.warnings.PydanticDeprecatedSince20"
+#   source /path/to/membench/init.sh
 #
-
-# Suppress Pydantic V2 deprecation warnings
-export PYTHONWARNINGS="ignore::pydantic.warnings.PydanticDeprecatedSince20,ignore::DeprecationWarning,ignore::UserWarning"
 
 # Optional: Set default API keys (uncomment and fill in)
 # export OPENAI_API_KEY="your-key-here"
@@ -27,10 +24,31 @@ export PYTHONWARNINGS="ignore::pydantic.warnings.PydanticDeprecatedSince20,ignor
 # export QDRANT_URL="http://localhost:6333"
 # export CHROMADB_URL="http://localhost:8000"
 
+# Wrapper function to run membench without Pydantic warnings
+# Note: Some external libraries (graphiti, letta) emit Pydantic V2 
+# deprecation warnings at import time that cannot be suppressed via 
+# PYTHONWARNINGS. This wrapper filters stderr to hide them.
+membench-quiet() {
+    membench "$@" 2>/dev/null
+}
+
+# Alternative: Only filter lines containing warning patterns
+membench-clean() {
+    membench "$@" 2>&1 | grep -v "PydanticDeprecated\|deprecat\|warning:"
+}
+
 echo "MemBench environment initialized."
-echo "Pydantic warnings suppressed."
 echo ""
 echo "Available commands:"
-echo "  membench list-stores      - List available memory stores"
-echo "  membench list-datasets    - List available datasets"
-echo "  membench run --config quick  - Run quick benchmark"
+echo "  membench list-stores              - List memory stores (shows warnings)"
+echo "  membench list-datasets            - List datasets (shows warnings)"
+echo "  membench run --config quick       - Run quick benchmark (shows warnings)"
+echo ""
+echo "Warning-free alternatives:"
+echo "  membench-quiet list-stores        - Same but hides all stderr"
+echo "  membench-clean list-stores        - Same but filters only warnings"
+echo ""
+echo "Or use: membench list-stores 2>/dev/null"
+echo ""
+echo "Note: Pydantic V2 warnings come from external libraries (graphiti, letta)"
+echo "      at import time and cannot be suppressed via PYTHONWARNINGS."
