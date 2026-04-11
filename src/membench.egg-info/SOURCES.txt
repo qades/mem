@@ -1,7 +1,9 @@
 README.md
 pyproject.toml
 src/membench/__init__.py
+src/membench/__main__.py
 src/membench/cli.py
+src/membench/entrypoint.py
 src/membench.egg-info/PKG-INFO
 src/membench.egg-info/SOURCES.txt
 src/membench.egg-info/dependency_links.txt

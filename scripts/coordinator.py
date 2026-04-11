@@ -5,6 +5,11 @@ Benchmark Coordinator Script
 Orchestrates benchmark runs with configurable scope.
 """
 
+# Suppress Pydantic deprecation warnings from external libraries
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+
 import argparse
 import json
 import sys

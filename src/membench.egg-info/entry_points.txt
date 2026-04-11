@@ -1,2 +1,2 @@
 [console_scripts]
-membench = membench.cli:main
+membench = membench.entrypoint:main

@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# MemBench CLI wrapper
+#
+# Suppresses Pydantic deprecation warnings from external libraries
+# before running the Python CLI.
+#
+
+# Suppress warnings
+export PYTHONWARNINGS="ignore::DeprecationWarning,ignore::UserWarning"
+
+# Run the Python module
+exec python3 -m membench.cli "$@"

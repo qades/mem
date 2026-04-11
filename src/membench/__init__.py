@@ -16,10 +16,25 @@ Usage:
     results = harness.run_benchmark(messages)
 """
 
+# Suppress Pydantic deprecation warnings from external libraries (graphiti, letta)
+# This must be at the very top before any imports that might trigger these warnings
+import warnings
+import sys
+
+# Use simplefilter for stronger suppression
+warnings.simplefilter("ignore", DeprecationWarning)
+warnings.simplefilter("ignore", UserWarning)
+
+# Also try to suppress specific Pydantic-related warnings
+if sys.version_info >= (3, 0):
+    warnings.filterwarnings("ignore", message=".*PydanticDeprecatedSince20.*")
+    warnings.filterwarnings("ignore", message=".*json_encoders.*")
+    warnings.filterwarnings("ignore", message=".*class-based.*config.*")
+
 __version__ = "0.1.0"
 __author__ = "Memory Benchmark Team"
 
-# Core exports
+# Core exports - these imports will trigger the external library loads
 from membench.memory_stores import (
     BaseMemoryStore,
     create_store,

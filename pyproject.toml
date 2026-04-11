@@ -59,7 +59,7 @@ dev = [
 ]
 
 [project.scripts]
-membench = "membench.cli:main"
+membench = "membench.entrypoint:main"
 
 [project.urls]
 Homepage = "https://github.com/yourusername/membench"

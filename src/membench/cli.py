@@ -10,10 +10,26 @@ Usage:
     membench run --stores mem0 zep --datasets locomo
 """
 
+# Suppress Pydantic deprecation warnings from external libraries (graphiti, letta)
+# Must be set BEFORE any imports that might trigger these warnings
+import warnings
+import os
+
+# Use both filterwarnings and environment variable for maximum effectiveness
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", message=".*PydanticDeprecatedSince20.*")
+warnings.filterwarnings("ignore", message=".*json_encoders.*")
+warnings.filterwarnings("ignore", message=".*Support for class-based.*")
+
+# Also suppress via env var for subprocesses
+os.environ["PYTHONWARNINGS"] = "ignore::DeprecationWarning,ignore::UserWarning"
+
 import argparse
 import sys
 from pathlib import Path
 
+# Now import membench (warnings should be suppressed)
 from membench import get_available_stores, __version__
 
 
