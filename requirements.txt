@@ -1,12 +1,44 @@
-# Requirements
-
 # Core dependencies
 requests>=2.31.0
 python-dateutil>=2.8.2
 
-# Vector stores (optional)
-# chromadb>=0.4.0  # For ChromaDB backend
-# faiss-cpu>=1.8.0  # For FAISS backend
+# Memory Store Libraries (for reference implementations)
+
+## Mem0 - Hybrid memory layer (vector + graph + key-value)
+# https://github.com/mem0ai/mem0
+mem0ai>=1.0.11
+
+## Zep - Temporal knowledge graph memory
+# https://github.com/getzep/zep-python
+zep-python>=2.0.2
+
+## Graphiti - Temporal knowledge graph engine
+# https://github.com/getzep/graphiti
+graphiti-core>=0.28.2
+neo4j>=5.26.0
+
+## Letta (MemGPT) - OS-style hierarchical memory
+# https://github.com/letta-ai/letta
+letta>=0.16.7
+
+## MemPalace - Spatial memory organization
+# https://github.com/MemPalace/mempalace
+mempalace>=3.1.0
+chromadb>=0.5.0,<0.7
+
+## A-MEM - Zettelkasten-style memory (optional, requires many deps)
+# a-mem>=0.2.6
+# litellm>=1.16.11
+
+## TrustGraph (optional)
+# trustgraph>=2.2.26
+
+## MuninnDB (custom/local)
+# Installed separately or use local implementation
+
+# Vector stores (optional - for VectorDBStore)
+chromadb>=0.4.0
+faiss-cpu>=1.8.0
 
 # Development
 pytest>=7.4.0

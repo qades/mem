@@ -1,6 +1,0 @@
-{
-  "store_type": "in_memory",
-  "collection_name": "memory",
-  "dimension": 768,
-  "metric": "cosine"
-}
