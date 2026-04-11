@@ -68,26 +68,38 @@ membench-quiet list-stores  # or: membench list-stores 2>/dev/null
 
 ### Running Benchmarks
 
-#### Quick Start - Use Everything Available
+**⚠️ Current Status:** The coordinator shows available resources but actual benchmark execution is not yet fully implemented. The old `run_benchmark.py` script can be used directly.
+
+#### Check What's Available
 
 ```bash
-# See what's available locally
+# See what stores and datasets are ready to use
 ./scripts/membench-coordinator.sh --available
 
-# Run benchmark with all available stores and datasets
-./scripts/membench-coordinator.sh --local
-
-# Results saved to benchmark_results/
+# Preview what would run
+./scripts/membench-coordinator.sh --local --dry-run
 ```
 
-#### Custom Configuration
+#### Container Networking
+
+When running inside Docker, the LLM API won't be at `localhost`:
 
 ```bash
-# Run with specific stores only (not yet implemented)
-./scripts/membench-coordinator.sh --local --stores mem0 vector_db knowledge_graph
+# For Docker Desktop / Linux
+export API_URL="http://host.docker.internal:58080/v1"
 
-# Run with specific datasets only (not yet implemented)
-./scripts/membench-coordinator.sh --local --datasets agentbench_unified mutual_unified
+# For Podman
+export API_URL="http://host.containers.internal:58080/v1"
+```
+
+#### Old Benchmark Runner (Working)
+
+```bash
+# Run specific benchmark config
+python scripts/run_benchmark.py --config config/baseline.json
+
+# Note: Update API URL in config or set environment variable
+export OPENAI_API_BASE="http://localhost:58080/v1"
 ```
 
 ## Project Structure
