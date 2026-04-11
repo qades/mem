@@ -10,12 +10,19 @@ Available datasets:
 - ProLong (long-context training data)
 - AgentBench (agent interactions)
 - MuTual (multi-turn dialogue reasoning)
+
+ProLong Compression:
+- ProLong is very large (~140GB). Use --compress to compress after download
+- Compression typically achieves 3-4x size reduction (bzip2 -3)
+- Compressed data is accessed seamlessly via data/compressed_dataset_loader.py
+- See compress_prolong.py for standalone compression utilities
 """
 
 import os
 import sys
 import json
 import argparse
+import subprocess
 from pathlib import Path
 from typing import Dict, List, Any
 from concurrent.futures import ThreadPoolExecutor
@@ -140,6 +147,55 @@ def download_prolong(output_dir: Path, version: str = "64K") -> Path:
         return None
 
 
+def check_compressed_prolong() -> Path:
+    """
+    Check for compressed ProLong dataset.
+    
+    Returns path to compressed dataset if available, None otherwise.
+    Compressed version is ~4x smaller and uses bzip2 -3 compression.
+    """
+    compressed_path = Path("compressed/prolong")
+    original_path = Path("data/prolong")
+    
+    if compressed_path.exists():
+        compressed_shards = len(list(compressed_path.glob("**/*.mds.bz2")))
+        if compressed_shards > 0:
+            compressed_size = sum(
+                f.stat().st_size for f in compressed_path.rglob("*.mds.bz2")
+            ) / (1024**3)  # GB
+            print(f"📦 Compressed ProLong found: {compressed_shards} shards ({compressed_size:.1f} GB)")
+            print(f"   Location: {compressed_path.absolute()}")
+            print(f"   Use data/compressed_dataset_loader.py for seamless access")
+            return compressed_path
+    
+    return None
+
+
+def get_prolong_path(prefer_compressed: bool = True) -> Path:
+    """
+    Get the path to ProLong dataset, with optional compression preference.
+    
+    Args:
+        prefer_compressed: If True, prefer compressed version if available
+        
+    Returns:
+        Path to ProLong dataset directory
+    """
+    original_path = Path("data/prolong")
+    compressed_path = Path("compressed/prolong")
+    
+    if prefer_compressed and compressed_path.exists():
+        return compressed_path
+    elif original_path.exists():
+        return original_path
+    elif compressed_path.exists():
+        return compressed_path
+    else:
+        raise FileNotFoundError(
+            "ProLong dataset not found. Download with: python download_datasets.py --datasets prolong"
+        )
+
+
 def convert_to_common_format(
     input_path: Path, output_path: Path, dataset_type: str
 ) -> None:
@@ -259,6 +315,7 @@ def convert_to_common_format(
     elif dataset_type == "prolong":
         # ProLong is pre-tokenized, extract text sequences
         # This requires special handling with mosaicml-streaming
+        # Compressed version available in compressed/prolong/ with .mds.bz2 files
         common_data.append(
             {
                 "dataset": "prolong",
@@ -271,7 +328,10 @@ def convert_to_common_format(
                     },
                 ],
                 "metadata": {
-                    "note": "ProLong requires huggingface_hub and mosaicml-streaming for full extraction"
+                    "note": "ProLong requires huggingface_hub and mosaicml-streaming for full extraction. "
+                            "Compressed version available - see data/compressed_dataset_loader.py",
+                    "compressed_path": "compressed/prolong",
+                    "compression": "bzip2 -3 (4x size reduction)"
                 },
             }
         )
@@ -312,8 +372,40 @@ def main():
         default=None,
         help="Specific subset for BABILong (e.g., 128k, 1m)",
     )
+    parser.add_argument(
+        "--check-compressed",
+        action="store_true",
+        help="Check for compressed ProLong dataset availability",
+    )
+    parser.add_argument(
+        "--compress",
+        action="store_true",
+        help="Compress ProLong dataset after download (saves ~75%% disk space)",
+    )
+    parser.add_argument(
+        "--compression-level",
+        type=int,
+        default=3,
+        choices=range(1, 10),
+        metavar="LEVEL",
+        help="Compression level 1-9 (default: 3, recommended sweet spot)",
+    )
+    parser.add_argument(
+        "--compression-threads",
+        type=int,
+        default=min(32, os.cpu_count() or 4),
+        help=f"Parallel compression threads (default: {min(32, os.cpu_count() or 4)})",
+    )
 
     args = parser.parse_args()
+    
+    # Check for compressed datasets if requested
+    if args.check_compressed:
+        print("Checking for compressed datasets...")
+        print("-" * 60)
+        check_compressed_prolong()
+        print("-" * 60)
+        return
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -342,6 +434,39 @@ def main():
         path = download_prolong(output_dir)
         if path:
             downloaded_paths["prolong"] = path
+            
+            # Compress ProLong if requested
+            if args.compress:
+                print("\n" + "=" * 60)
+                print("Compressing ProLong dataset...")
+                print("=" * 60)
+                print(f"This will reduce disk usage by ~75% using bzip2 -{args.compression_level}")
+                print(f"Using {args.compression_threads} parallel threads")
+                print("")
+                
+                compress_path = Path("compressed/prolong")
+                compress_path.mkdir(parents=True, exist_ok=True)
+                
+                # Run compression using compress_prolong.py if available
+                compress_script = Path(__file__).parent / "compress_prolong.py"
+                if compress_script.exists():
+                    result = subprocess.run([
+                        sys.executable, str(compress_script),
+                        "--input", str(path),
+                        "--output", str(compress_path),
+                        "--threads", str(args.compression_threads),
+                        "--level", str(args.compression_level)
+                    ])
+                    
+                    if result.returncode == 0:
+                        print("\n✓ ProLong compression complete!")
+                        print(f"  Compressed data location: {compress_path}")
+                        print(f"  Use data/compressed_dataset_loader.py for seamless access")
+                    else:
+                        print("\n⚠ Compression failed or incomplete", file=sys.stderr)
+                else:
+                    print(f"\n⚠ Compression script not found: {compress_script}")
+                    print("  Run manually: python compress_prolong.py")
 
     if args.convert:
         print("\n" + "=" * 60)
@@ -367,6 +492,12 @@ def main():
     print("- MuTual: Good for multi-turn dialogue with reasoning")
     print("- AgentBench: Good for agent-environment interactions")
     print("- ProLong: Pre-tokenized long-context training data (64K or 512K tokens)")
+    print("  ├─ Large dataset (~140GB) - use --compress to save ~75% disk space")
+    print("  ├─ Compressed: compressed/prolong/ (~4x smaller, ~35-45GB)")
+    print("  └─ Access: data/compressed_dataset_loader.py (seamless, works with both)")
+    print("\nCompression commands:")
+    print("  python download_datasets.py --datasets prolong --compress")
+    print("  python compress_prolong.py --threads 32 --level 3")
 
 
 if __name__ == "__main__":

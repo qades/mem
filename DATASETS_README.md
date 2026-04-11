@@ -52,17 +52,56 @@ python download_datasets.py --datasets agentbench --convert
 
 ### 4. ProLong 📚
 **Purpose**: Long-context training data
-- **Size**: 64K or 512K token sequences
+- **Size**: 64K or 512K token sequences (~140GB uncompressed)
 - **Format**: Pre-tokenized (requires special loading)
 - **Best for**: Training long-context models
+- **⚠️ Note**: Very large dataset - **strongly recommend using compression**
 
-**Usage**:
+**Quick Start (Recommended - with compression)**:
+```bash
+# Download and compress (saves ~75% disk space, ~35-45GB final)
+python download_datasets.py --datasets prolong --compress
+
+# Check compression status
+python download_datasets.py --check-compressed
+
+# Or use standalone compression tool
+python compress_prolong.py --threads 32 --level 3
+```
+
+**Standard Download (without compression)**:
 ```bash
 # 64K version
-python download_datasets.py --datasets prolong --version 64K
+python download_datasets.py --datasets prolong
 
-# 512K version
-python download_datasets.py --datasets prolong --version 512K
+# 512K version (not yet available in this repo)
+# python download_datasets.py --datasets prolong --version 512K
+```
+
+**Compression Details**:
+- **Algorithm**: bzip2 level 3 (optimal speed/compression ratio)
+- **Typical ratio**: 3-4x (140GB → 35-45GB)
+- **Parallel**: Uses all available CPU cores by default (32 threads)
+- **Time**: ~5 minutes with 32 threads vs ~2 hours single-threaded
+- **Access**: Fully transparent via `compressed_dataset_loader.py`
+
+**Compressed Data Access** (Automatic - No Flags Needed!):
+```python
+from load_datasets import load_prolong, get_prolong_info
+
+# Check what's available
+info = get_prolong_info()
+print(f"Original: {info['original_size_gb']:.1f} GB")
+print(f"Compressed: {info['compressed_size_gb']:.1f} GB")
+print(f"Ratio: {info['compression_ratio']:.2f}x")
+
+# Load dataset - compression auto-detected!
+dataset = load_prolong()  # Works with .mds or .mds.bz2 transparently
+
+# Direct file access - just use the path, extension detected automatically
+from data.compressed_dataset_loader import open_compressed
+with open_compressed('path/to/shard.mds') as f:  # auto-finds .bz2 if needed
+    data = f.read()
 ```
 
 ## Quick Start
@@ -165,6 +204,52 @@ All datasets are unified to this format:
 - **Context Window Efficiency**: Performance vs context size
 - **Memory Retention**: Information recall after many turns
 - **Retrieval Precision**: Correct fact retrieval from long context
+
+## Compression Utilities
+
+For users who need to compress existing ProLong datasets:
+
+### compress_prolong.py
+
+Standalone compression utility with parallel processing:
+
+```bash
+# Basic compression (auto-detects threads)
+python compress_prolong.py
+
+# Custom settings
+python compress_prolong.py --threads 32 --level 3
+
+# Check compression status
+python compress_prolong.py --info
+
+# Verify compressed dataset integrity
+python compress_prolong.py --verify-only
+
+# Decompress (restore original files)
+python compress_prolong.py --decompress
+
+# Custom paths
+python compress_prolong.py --input ./my_prolong --output ./compressed
+```
+
+**Compression levels**:
+- `1`: Fastest, lowest compression (~2.5x)
+- `3`: **Recommended** - sweet spot for speed/size (~3-4x)
+- `6-9`: Better compression but much slower (diminishing returns)
+
+### Disk Space Management
+
+```bash
+# Check space usage
+du -sh data/prolong compressed/prolong
+
+# After verifying compressed version works:
+# rm -rf data/prolong  # ⚠️ CAUTION: Only if compressed version verified!
+
+# Or use built-in cleanup
+python compress_prolong.py --remove-original  # Built-in safety checks
+```
 
 ## Troubleshooting
 

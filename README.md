@@ -77,6 +77,26 @@ JSONL format with role/content:
 {"role": "assistant", "content": "Hi there"}
 ```
 
+### ProLong Dataset (Compressed)
+
+The ProLong dataset is very large (~140GB uncompressed). We provide transparent compression:
+
+```bash
+# Download with compression (~75% space savings)
+python download_datasets.py --datasets prolong --compress
+
+# Or compress existing dataset
+python compress_prolong.py --threads 32
+```
+
+**Access is automatic** - no code changes needed:
+```python
+from load_datasets import load_prolong
+dataset = load_prolong()  # Works with .mds or .mds.bz2 transparently!
+```
+
+The code auto-detects `.bz2` files based on extension. See [DATASETS_README.md](DATASETS_README.md) for details.
+
 ## Output
 
 Results saved to `benchmark_results/`:

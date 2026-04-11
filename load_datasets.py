@@ -4,12 +4,32 @@ Loader utilities for unified multi-turn/long-context datasets.
 
 Provides consistent loading and preprocessing for datasets downloaded
 by download_datasets.py, formatted for memory framework testing.
+
+Compressed dataset support:
+- ProLong dataset can be stored compressed (bzip2 -3, ~4x smaller)
+- Use compressed_dataset_loader.py for seamless transparent access
+- Compressed location: compressed/prolong/
 """
 
 import json
+import os
+import sys
 from pathlib import Path
-from typing import List, Dict, Any, Iterator
+from typing import List, Dict, Any, Iterator, Optional
 import random
+
+# Add data directory to path for compressed loader
+sys.path.insert(0, str(Path(__file__).parent / "data"))
+try:
+    from compressed_dataset_loader import (
+        open_compressed,
+        find_shard_file,
+        load_prolong_dataset,
+        get_dataset_path,
+    )
+    _HAS_COMPRESSED_LOADER = True
+except ImportError:
+    _HAS_COMPRESSED_LOADER = False
 
 
 def load_unified_dataset(
@@ -268,6 +288,74 @@ def extract_key_facts(turns: List[Dict[str, str]]) -> List[str]:
                     facts.append(sentence.strip())
 
     return facts[:10]  # Return up to 10 key facts
+
+
+def load_prolong(data_path: Optional[str] = None, **kwargs) -> Any:
+    """
+    Load ProLong dataset with automatic compression detection.
+    
+    Automatically detects and handles both compressed (.mds.bz2) and
+    uncompressed (.mds) files. If a file exists in both formats, the
+    uncompressed version is preferred.
+    
+    Args:
+        data_path: Path to ProLong dataset (default: auto-detect from
+                  data/prolong or compressed/prolong)
+        **kwargs: Additional arguments passed to StreamingDatasetWrapper
+        
+    Returns:
+        StreamingDatasetWrapper providing access to the dataset
+        
+    Example:
+        >>> dataset = load_prolong()
+        >>> print(f"Dataset size: {len(dataset)}")
+        >>> for sample in dataset:
+        ...     process(sample)
+        
+    Note:
+        Requires mosaicml-streaming for full functionality. Without it,
+        provides basic file access to shard contents.
+    """
+    if not _HAS_COMPRESSED_LOADER:
+        raise ImportError(
+            "Compressed dataset loader not available. "
+            "Ensure data/compressed_dataset_loader.py exists."
+        )
+    
+    if data_path is None:
+        data_path = str(get_dataset_path())
+    
+    return load_prolong_dataset(data_path, **kwargs)
+
+
+def get_prolong_info() -> Dict[str, Any]:
+    """
+    Get information about available ProLong datasets.
+    
+    Returns:
+        Dictionary with paths and compression info
+    """
+    info = {
+        "original_path": "data/prolong",
+        "compressed_path": "compressed/prolong",
+        "original_exists": Path("data/prolong").exists(),
+        "compressed_exists": Path("compressed/prolong").exists(),
+    }
+    
+    if info["original_exists"]:
+        orig_files = list(Path("data/prolong").rglob("*.mds"))
+        info["original_shards"] = len(orig_files)
+        info["original_size_gb"] = sum(f.stat().st_size for f in orig_files) / (1024**3)
+    
+    if info["compressed_exists"]:
+        comp_files = list(Path("compressed/prolong").rglob("*.mds.bz2"))
+        info["compressed_shards"] = len(comp_files)
+        if comp_files:
+            info["compressed_size_gb"] = sum(f.stat().st_size for f in comp_files) / (1024**3)
+            if info.get("original_size_gb"):
+                info["compression_ratio"] = info["original_size_gb"] / info["compressed_size_gb"]
+    
+    return info
 
 
 # Example usage
