@@ -48,23 +48,47 @@ docker-compose -f docker/docker-compose.yml --profile benchmark run -e BENCHMARK
 ### CLI Usage
 
 ```bash
-# Initialize environment first (suppresses warnings)
+# Initialize environment first (sets up useful aliases)
 source init.sh
 
 # List available memory stores
 membench list-stores
 
-# List available datasets
+# List available datasets  
 membench list-datasets
 
-# Run quick benchmark
-membench run --config quick
+# Run benchmark with all available stores and datasets
+./scripts/membench-coordinator.sh --local
 
-# Run specific stores on specific datasets
-membench run --stores mem0 zep --datasets locomo babilong
+# Hide Pydantic warnings
+membench-quiet list-stores  # or: membench list-stores 2>/dev/null
 ```
 
 **Note:** Some memory libraries (graphiti, letta) emit Pydantic V2 deprecation warnings at import time that cannot be suppressed via `PYTHONWARNINGS`. Use `membench-quiet` (after sourcing `init.sh`) or append `2>/dev/null` to hide them.
+
+### Running Benchmarks
+
+#### Quick Start - Use Everything Available
+
+```bash
+# See what's available locally
+./scripts/membench-coordinator.sh --available
+
+# Run benchmark with all available stores and datasets
+./scripts/membench-coordinator.sh --local
+
+# Results saved to benchmark_results/
+```
+
+#### Custom Configuration
+
+```bash
+# Run with specific stores only (not yet implemented)
+./scripts/membench-coordinator.sh --local --stores mem0 vector_db knowledge_graph
+
+# Run with specific datasets only (not yet implemented)
+./scripts/membench-coordinator.sh --local --datasets agentbench_unified mutual_unified
+```
 
 ## Project Structure
 
