@@ -7,7 +7,8 @@ Runs benchmarks with available stores and datasets.
 Usage:
     coordinator --available              # Show what's available
     coordinator --local                  # Run with all available resources
-    coordinator --local --dry-run        # Show what would run without executing
+    coordinator --local --dry-run        # Show what would run
+    coordinator --api-url http://...     # Use different API endpoint
 """
 
 import argparse
@@ -26,37 +27,38 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from membench import get_available_stores
 from membench.benchmark.dataset_loader import get_available_datasets
+from membench.benchmark.runner import BenchmarkRunner
 
 
 def get_valid_datasets():
     """Get datasets that actually have content (not stubs)."""
     data_dir = Path(__file__).parent.parent / "data"
-    datasets = []
+    datasets = {}
     
-    # Check for actual data files
+    # Look for actual data files
     for f in data_dir.glob("*.jsonl"):
-        if f.stat().st_size > 10000:  # Must be > 10KB to be real data
-            datasets.append(f.stem.replace("_unified", ""))
+        if f.stat().st_size > 10000:
+            name = f.stem.replace("_unified", "")
+            datasets[name] = str(f)
     
-    # Also check datasets/ subdirectory
     datasets_dir = data_dir / "datasets"
     if datasets_dir.exists():
         for f in datasets_dir.glob("*.jsonl"):
             if f.stat().st_size > 10000:
-                datasets.append(f.stem.replace("_unified", ""))
+                name = f.stem.replace("_unified", "")
+                datasets[name] = str(f)
     
-    return sorted(set(datasets))
+    return datasets  # Returns {name: path} dict
 
 
 def get_valid_stores():
-    """Get stores that can actually be instantiated."""
+    """Get stores that can be instantiated without external services."""
     stores = get_available_stores()
     valid = []
     
     for name in stores.keys():
-        # Skip stores that require external services not running
-        if name in ["graphiti", "zep", "letta"]:
-            # These need Neo4j, Zep server, etc.
+        # Skip stores requiring external services
+        if name in ["graphiti", "zep"]:
             continue
         valid.append(name)
     
@@ -79,7 +81,7 @@ def cmd_available(args):
         print(f"  {name:15} {status}")
     
     print(f"\nDatasets ({len(datasets)}):")
-    for name in datasets:
+    for name in sorted(datasets.keys()):
         print(f"  ✓ {name}")
     
     print("\n" + "="*60)
@@ -94,56 +96,78 @@ def cmd_available(args):
 def cmd_local(args):
     """Run benchmark with available resources."""
     stores = get_valid_stores()
-    datasets = get_valid_datasets()
+    datasets_dict = get_valid_datasets()
+    dataset_names = list(datasets_dict.keys())
     
     if not stores:
         print("Error: No memory stores available!")
         return 1
     
-    if not datasets:
+    if not dataset_names:
         print("Error: No datasets available!")
         return 1
+    
+    # Determine API URL
+    api_url = args.api_url
+    if not api_url:
+        # Try environment variable
+        api_url = os.environ.get("OPENAI_API_BASE", "http://localhost:58080/v1")
     
     print("\n" + "="*60)
     print("LOCAL BENCHMARK RUN")
     print("="*60)
-    print(f"\nStores: {', '.join(stores)}")
-    print(f"Datasets: {', '.join(datasets)}")
-    print(f"Max messages: 20")
+    print(f"\nAPI URL: {api_url}")
+    print(f"Stores: {', '.join(stores)}")
+    print(f"Datasets: {', '.join(dataset_names)}")
+    print(f"Max messages: {args.max_messages}")
     
     if args.dry_run:
         print("\n[DRY RUN - No execution]")
         print("="*60 + "\n")
         return 0
     
+    # Run benchmarks
     print("\n" + "="*60)
-    print("\n⚠️  ACTUAL BENCHMARK EXECUTION NOT YET IMPLEMENTED")
-    print("\nThe coordinator currently shows what's available but doesn't")
-    print("yet wire up to the actual benchmark harness.")
-    print("\nTo run actual benchmarks, use the old run_benchmark.py:")
-    print("  python scripts/run_benchmark.py --config config/baseline.json")
-    print("\nNOTE: Requires LLM API running at localhost:58080")
-    print("For Docker, use: http://host.containers.internal:58080")
-    print("="*60 + "\n")
+    print("\nStarting benchmark execution...")
+    print("="*60)
     
-    # Save config for future use
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    config = {
-        "timestamp": datetime.now().isoformat(),
-        "stores": stores,
-        "datasets": datasets,
-        "max_messages": 20,
-        "note": "Benchmark execution pending implementation",
-    }
-    
-    config_file = output_dir / f"config_{datetime.now():%Y%m%d_%H%M%S}.json"
-    with open(config_file, "w") as f:
-        json.dump(config, f, indent=2)
-    print(f"Config saved to: {config_file}\n")
-    
-    return 0
+    try:
+        runner = BenchmarkRunner(
+            api_url=api_url,
+            output_dir=args.output_dir,
+            max_messages=args.max_messages,
+        )
+        
+        results = runner.run_all(stores, dataset_names)
+        
+        # Print summary
+        print("\n" + "="*60)
+        print("BENCHMARK COMPLETE")
+        print("="*60)
+        print(f"\nTotal: {results['summary']['total']}")
+        print(f"Successful: {results['summary']['successful']}")
+        print(f"Failed: {results['summary']['failed']}")
+        
+        if results['results']:
+            print("\nResults preview:")
+            for r in results['results'][:5]:
+                print(f"  {r['store']} + {r['dataset']}: {r['context_size']} tokens, {r['response_time_ms']:.1f}ms")
+        
+        if results['errors']:
+            print("\nErrors:")
+            for e in results['errors'][:5]:
+                print(f"  ✗ {e['store']} + {e['dataset']}")
+        
+        print(f"\nResults saved to: {args.output_dir}/")
+        print("="*60 + "\n")
+        
+        return 0 if results['summary']['failed'] == 0 else 1
+        
+    except Exception as e:
+        print(f"\n✗ Benchmark failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
 
 
 def main():
@@ -168,6 +192,18 @@ def main():
         "--dry-run",
         action="store_true",
         help="Show what would run without executing",
+    )
+    
+    parser.add_argument(
+        "--api-url",
+        help="LLM API URL (default: http://localhost:58080/v1 or $OPENAI_API_BASE)",
+    )
+    
+    parser.add_argument(
+        "--max-messages",
+        type=int,
+        default=20,
+        help="Maximum messages to process (default: 20)",
     )
     
     parser.add_argument(

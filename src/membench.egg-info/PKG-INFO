@@ -101,23 +101,63 @@ docker-compose -f docker/docker-compose.yml --profile benchmark run -e BENCHMARK
 ### CLI Usage
 
 ```bash
-# Initialize environment first (suppresses warnings)
+# Initialize environment first (sets up useful aliases)
 source init.sh
 
 # List available memory stores
 membench list-stores
 
-# List available datasets
+# List available datasets  
 membench list-datasets
 
-# Run quick benchmark
-membench run --config quick
+# Run benchmark with all available stores and datasets
+./scripts/membench-coordinator.sh --local
 
-# Run specific stores on specific datasets
-membench run --stores mem0 zep --datasets locomo babilong
+# Hide Pydantic warnings
+membench-quiet list-stores  # or: membench list-stores 2>/dev/null
 ```
 
 **Note:** Some memory libraries (graphiti, letta) emit Pydantic V2 deprecation warnings at import time that cannot be suppressed via `PYTHONWARNINGS`. Use `membench-quiet` (after sourcing `init.sh`) or append `2>/dev/null` to hide them.
+
+### Running Benchmarks
+
+#### Quick Start
+
+```bash
+# See what stores and datasets are ready
+./scripts/membench-coordinator.sh --available
+
+# Run with all available resources (dry run first)
+./scripts/membench-coordinator.sh --local --dry-run
+./scripts/membench-coordinator.sh --local
+
+# Results saved to benchmark_results/
+```
+
+#### Container Networking
+
+When running inside Docker, the LLM API won't be at `localhost`:
+
+```bash
+# For Docker Desktop / Linux with Docker
+export OPENAI_API_BASE="http://host.docker.internal:58080/v1"
+
+# For Podman
+export OPENAI_API_BASE="http://host.containers.internal:58080/v1"
+
+# Or pass directly
+./scripts/membench-coordinator.sh --local --api-url http://host.docker.internal:58080/v1
+```
+
+#### Advanced Usage
+
+```bash
+# Run with custom message limit
+./scripts/membench-coordinator.sh --local --max-messages 50
+
+# Run with custom output directory
+./scripts/membench-coordinator.sh --local --output-dir my_results/
+```
 
 ## Project Structure
 

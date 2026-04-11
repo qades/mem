@@ -1,3 +1,2 @@
 [console_scripts]
 membench = membench.entrypoint:main
-membench-coordinator = scripts.coordinator:main

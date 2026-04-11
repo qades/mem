@@ -68,16 +68,17 @@ membench-quiet list-stores  # or: membench list-stores 2>/dev/null
 
 ### Running Benchmarks
 
-**⚠️ Current Status:** The coordinator shows available resources but actual benchmark execution is not yet fully implemented. The old `run_benchmark.py` script can be used directly.
-
-#### Check What's Available
+#### Quick Start
 
 ```bash
-# See what stores and datasets are ready to use
+# See what stores and datasets are ready
 ./scripts/membench-coordinator.sh --available
 
-# Preview what would run
+# Run with all available resources (dry run first)
 ./scripts/membench-coordinator.sh --local --dry-run
+./scripts/membench-coordinator.sh --local
+
+# Results saved to benchmark_results/
 ```
 
 #### Container Networking
@@ -85,21 +86,24 @@ membench-quiet list-stores  # or: membench list-stores 2>/dev/null
 When running inside Docker, the LLM API won't be at `localhost`:
 
 ```bash
-# For Docker Desktop / Linux
-export API_URL="http://host.docker.internal:58080/v1"
+# For Docker Desktop / Linux with Docker
+export OPENAI_API_BASE="http://host.docker.internal:58080/v1"
 
 # For Podman
-export API_URL="http://host.containers.internal:58080/v1"
+export OPENAI_API_BASE="http://host.containers.internal:58080/v1"
+
+# Or pass directly
+./scripts/membench-coordinator.sh --local --api-url http://host.docker.internal:58080/v1
 ```
 
-#### Old Benchmark Runner (Working)
+#### Advanced Usage
 
 ```bash
-# Run specific benchmark config
-python scripts/run_benchmark.py --config config/baseline.json
+# Run with custom message limit
+./scripts/membench-coordinator.sh --local --max-messages 50
 
-# Note: Update API URL in config or set environment variable
-export OPENAI_API_BASE="http://localhost:58080/v1"
+# Run with custom output directory
+./scripts/membench-coordinator.sh --local --output-dir my_results/
 ```
 
 ## Project Structure

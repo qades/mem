@@ -34,6 +34,20 @@ def load_dataset(
     data_path = Path("data") / f"{dataset_name}.jsonl"
     if data_path.exists():
         return load_jsonl_dataset(str(data_path), max_messages=max_messages)
+    
+    # Try with _unified suffix
+    unified_path = Path("data") / f"{dataset_name}_unified.jsonl"
+    if unified_path.exists():
+        return load_jsonl_dataset(str(unified_path), max_messages=max_messages)
+    
+    # Try in datasets/ subdirectory
+    datasets_path = Path("data") / "datasets" / f"{dataset_name}.jsonl"
+    if datasets_path.exists():
+        return load_jsonl_dataset(str(datasets_path), max_messages=max_messages)
+    
+    datasets_unified = Path("data") / "datasets" / f"{dataset_name}_unified.jsonl"
+    if datasets_unified.exists():
+        return load_jsonl_dataset(str(datasets_unified), max_messages=max_messages)
 
     # Try loading from benchmark_results directory
     result_path = Path("benchmark_results") / f"{dataset_name}.jsonl"
@@ -42,7 +56,7 @@ def load_dataset(
 
     raise FileNotFoundError(
         f"Dataset '{dataset_name}' not found. "
-        f"Looked in data/, benchmark_results/, and data/test_dataset.jsonl"
+        f"Looked in data/, data/datasets/, benchmark_results/, and data/test_dataset.jsonl"
     )
 
 

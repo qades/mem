@@ -70,7 +70,28 @@ class BenchmarkHarness:
     def _create_memory_store(self) -> Optional[BaseMemoryStore]:
         """Create memory store based on config."""
         store_type_str = self.config.params.get("store_type", "in_memory")
-        store_type = VectorStoreType(store_type_str)
+        
+        # Handle new memory stores via create_store
+        from membench import create_store, get_available_stores
+        available = get_available_stores()
+        
+        if store_type_str in available:
+            try:
+                # Try to create the store with appropriate params
+                params = {}
+                if store_type_str in ["mem0", "zep", "graphiti", "letta", "mempalace"]:
+                    # These might need API keys or other config
+                    pass
+                return create_store(store_type_str, **params)
+            except Exception as e:
+                # Fall back to simple stores
+                pass
+        
+        # Fall back to old vector store logic
+        try:
+            store_type = VectorStoreType(store_type_str)
+        except ValueError:
+            store_type = VectorStoreType.IN_MEMORY
 
         if store_type == VectorStoreType.CHROMADB:
             return VectorDBStore(

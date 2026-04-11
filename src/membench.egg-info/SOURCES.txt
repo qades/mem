@@ -13,6 +13,7 @@ src/membench.egg-info/top_level.txt
 src/membench/benchmark/__init__.py
 src/membench/benchmark/dataset_loader.py
 src/membench/benchmark/harness.py
+src/membench/benchmark/runner.py
 src/membench/config/__init__.py
 src/membench/config/manager.py
 src/membench/context_managers/__init__.py
