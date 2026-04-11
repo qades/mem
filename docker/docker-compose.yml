@@ -10,7 +10,7 @@ services:
 
   # Neo4j - For Graphiti and Zep temporal knowledge graphs
   neo4j:
-    image: neo4j:5.15-community
+    image: docker.io/library/neo4j:5.15-community
     container_name: mem-benchmark-neo4j
     ports:
       - "7474:7474"  # HTTP browser
@@ -35,7 +35,7 @@ services:
 
   # Qdrant - Vector database for Mem0
   qdrant:
-    image: qdrant/qdrant:latest
+    image: docker.io/qdrant/qdrant:latest
     container_name: mem-benchmark-qdrant
     ports:
       - "6333:6333"  # HTTP
@@ -55,7 +55,7 @@ services:
 
   # ChromaDB - Vector database for MemPalace
   chromadb:
-    image: chromadb/chroma:0.5.5
+    image: docker.io/chromadb/chroma:0.5.5
     container_name: mem-benchmark-chromadb
     ports:
       - "8000:8000"
@@ -80,7 +80,7 @@ services:
 
   # Zep Server - Temporal knowledge graph service
   zep:
-    image: zepai/zep:latest
+    image: docker.io/zepai/zep:latest
     container_name: mem-benchmark-zep
     ports:
       - "8001:8000"
@@ -105,7 +105,7 @@ services:
       - full  # Only start with: docker-compose --profile full up
 
   zep-postgres:
-    image: postgres:15-alpine
+    image: docker.io/library/postgres:15-alpine
     container_name: mem-benchmark-zep-postgres
     environment:
       - POSTGRES_USER=zep
